@@ -2,9 +2,9 @@
 > From version: 1.0.0
 > Schema version: 1.0
 > Status: Ready
-> Understanding: 90%
-> Confidence: 85%
-> Progress: 0%
+> Understanding: 95
+> Confidence: 90
+> Progress: 0
 > Complexity: High
 > Theme: Operator workflow and runtime integration
 > Reminder: Update status/understanding/confidence/progress and linked request/task references when you edit this doc.
@@ -16,23 +16,27 @@ Les recherches d'emploi sur plusieurs plateformes produisent beaucoup d'offres r
 - In:
   - CLI locale lancee a la demande.
   - Base SQLite pour offres, sources, executions, analyses et scores.
-  - Profil utilisateur declaratif dans un fichier local.
-  - Connecteurs isoles pour sources d'offres, avec au moins un connecteur simple utilisable en MVP.
+  - Profil utilisateur declaratif dans un fichier local, initialise a partir d'un CV fourni par l'utilisateur.
+  - Un seul provider au depart, avec connecteur isole pour permettre d'ajouter LinkedIn, Welcome to the Jungle ou Indeed ensuite.
+  - Integration API-first quand une API officielle accessible existe; fallback possible sur pages publiques autorisees pour le provider choisi.
   - Deduplication par URL canonique, identifiant source quand disponible et empreinte de contenu.
-  - Scoring interpretable: correspondances, ecarts, signaux positifs et risques.
-  - Sortie console ou fichier lisible presentant le top des nouvelles offres analysees.
+  - Filtre obligatoire de localisation: Paris ou full remote.
+  - Scoring interpretable: eligibilite localisation, skill match, seniority match, ecarts, signaux positifs et risques.
+  - Sortie console ou fichier lisible presentant le top 5 des nouvelles offres analysees.
+  - Stockage des elements necessaires a une generation future de CV et lettre: exigences extraites, mots-cles, raisons de score, version du profil.
 - Out:
   - Connexion automatisee a des comptes personnels LinkedIn, Welcome to the Jungle ou Indeed.
   - Contournement de protections anti-bot, captchas ou limitations de plateformes.
+  - Pipeline base sur exports manuels comme source produit principale.
   - Generation automatique de CV ou lettre de motivation.
   - Interface web ou app desktop.
   - Envoi automatique de candidatures.
 
 # Acceptance criteria
 - AC1: Une commande documentee initialise ou migre la base locale.
-- AC2: Une commande documentee execute une collecte, ajoute uniquement les offres inconnues ou modifiees, et trace l'execution.
-- AC3: Les offres nouvelles sont analysees contre un profil local et stockent score, ecarts, raisons et date d'analyse.
-- AC4: Le top de sortie trie les offres par pertinence et affiche les informations necessaires pour decider quoi lire ou postuler.
+- AC2: Une commande documentee execute une collecte depuis le provider initial, ajoute uniquement les offres inconnues ou modifiees, et trace l'execution.
+- AC3: Les offres nouvelles sont filtrees par localisation obligatoire puis analysees contre un profil local derive du CV; elles stockent score, ecarts, raisons et date d'analyse.
+- AC4: Le top de sortie trie les offres eligibles par pertinence, garde un top 5 initial et affiche les informations necessaires pour decider quoi lire ou postuler.
 - AC5: Les connecteurs de source sont decouples du pipeline d'analyse afin d'en ajouter ou remplacer un sans modifier le scoring.
 - AC6: Les limites des plateformes et les modes d'entree acceptables sont documentes dans le README ou les specs.
 
@@ -46,10 +50,10 @@ Les recherches d'emploi sur plusieurs plateformes produisent beaucoup d'offres r
 
 # Decision framing
 - Product framing: Needed to keep the MVP focused on decision support rather than application automation.
-- Product signals: local-first, explainable ranking, repeatable runs, future document generation.
+- Product signals: local-first, API-first provider, no manual export dependency, explainable ranking, location gating, repeatable runs, future document generation.
 - Product follow-up: Keep the product brief updated when source strategy or scoring UX changes.
 - Architecture framing: Needed because source ingestion is fragile and must be isolated from storage and scoring.
-- Architecture signals: SQLite, connector interface, content fingerprints, deterministic scoring baseline.
+- Architecture signals: SQLite, connector interface, API/page-ingestion boundary, content fingerprints, deterministic scoring baseline, future rescore path.
 - Architecture follow-up: Revisit once a browser-assisted or API-backed connector is selected.
 
 # Links
@@ -67,6 +71,18 @@ Les recherches d'emploi sur plusieurs plateformes produisent beaucoup d'offres r
 # Priority
 - Impact: High, because it reduces repeated manual review and makes job search decisions comparable.
 - Urgency: Medium, suitable as the first product slice before document-generation automation.
+
+# Refinement questions
+- Provider: confirme-t-on Welcome to the Jungle comme premier provider si l'acces API/token est disponible, avec fallback pages publiques si l'API n'est pas accessible?
+- API access: disposes-tu deja d'un token, compte developpeur, partenariat ou credentials pour l'un des providers?
+- Third-party API: acceptes-tu un service tiers payant ou freemium de type scraping API si les APIs officielles ne permettent pas la recherche d'offres?
+- Search scope: quels mots-cles ou intitules de poste doivent alimenter la premiere collecte?
+- Location: Paris signifie Paris intramuros seulement, Ile-de-France, ou une distance maximale autour de Paris?
+- Full remote: accepte-t-on remote France uniquement, Europe, ou worldwide?
+- Seniority: quel niveau cibler au depart: junior, confirme, senior, lead, manager?
+- CV source: veux-tu que le premier import encode uniquement competences/langues/experiences, ou aussi preferences implicites extraites du CV?
+- Output: le top 5 doit-il etre uniquement console, Markdown, CSV, ou plusieurs formats?
+- Documents futurs: garde-t-on PPT/Word comme cible initiale ou bascule-t-on vite vers HTML/Markdown/LaTeX pour generer PDF et DOCX?
 
 # Notes
 - Hybrid rationale: Derived from request `req_000_mvp_job_reviewer` and kept bounded to one coherent delivery slice.

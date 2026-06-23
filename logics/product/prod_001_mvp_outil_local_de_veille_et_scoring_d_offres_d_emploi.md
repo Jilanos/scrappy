@@ -1,9 +1,9 @@
 ## prod_001_mvp_outil_local_de_veille_et_scoring_d_offres_d_emploi - MVP outil local de veille et scoring d'offres d'emploi
 > Date: 2026-06-23
-> Status: Proposed
+> Status: Active
 > Related request: `req_000_mvp_job_reviewer`
 > Related backlog: `item_001_mvp_outil_local_de_veille_et_scoring_d_offres_d_emploi`
-> Related task: (none yet)
+> Related task: `task_001_mvp_outil_local_de_veille_et_scoring_d_offres_d_emploi`
 > Related architecture: `adr_001_mvp_outil_local_de_veille_et_scoring_d_offres_d_emploi`
 > Reminder: Update status, linked refs, scope, decisions, success signals, and open questions when you edit this doc.
 
@@ -25,23 +25,28 @@ flowchart TD
 - Identifier rapidement les offres les plus pertinentes avec des raisons lisibles.
 - Conserver un historique local des offres vues, analysees et ignorees.
 - Poser une base de donnees exploitable pour une phase ulterieure de CV et lettre adaptes.
+- Demarrer avec un seul provider pour prouver le pipeline avant d'etendre a LinkedIn, Welcome to the Jungle et Indeed.
 
 # Non-goals
 - Postuler automatiquement.
 - Se connecter a des comptes personnels ou contourner les limitations des plateformes.
+- Dependre d'un export manuel comme source produit principale.
 - Generer le CV ou la lettre de motivation dans le MVP.
 - Remplacer le jugement utilisateur par une decision automatique.
 - Fournir une interface graphique dans la premiere version.
 
 # Scope and guardrails
-- In: CLI locale, configuration de sources, profil utilisateur local, base SQLite, deduplication, analyse des nouvelles offres, classement interpretable.
+- In: CLI locale, provider initial configure, profil utilisateur local derive d'un CV, base SQLite, deduplication, analyse des nouvelles offres, classement interpretable.
 - In: modele de donnees preservant titre, entreprise, localisation, remote, salaire si disponible, description, URL, source, empreinte de contenu, score, raisons et ecarts.
 - Out: automatisation de candidature, scraping authentifie, orchestration cloud, synchronisation multi-utilisateur.
 - Guardrail: l'outil doit documenter clairement que chaque connecteur depend des conditions et contraintes de la source cible.
 
 # Key product decisions
 - Le MVP est local-first: donnees et profil restent sur la machine de l'utilisateur.
+- Le MVP est provider-first: un seul provider initial, probablement Welcome to the Jungle si l'acces API ou pages publiques est viable.
 - Le premier scoring doit etre interpretable avant d'etre intelligent: une heuristique transparente est acceptable si elle expose ses raisons.
+- La localisation est un critere bloquant: Paris ou full remote.
+- Le top initial conserve 5 offres, puis les seuils seront calibres avec l'usage.
 - Les connecteurs de sources sont des modules remplacables, car LinkedIn, Welcome to the Jungle et Indeed changent leurs pages et politiques.
 - Les offres deja vues restent visibles dans la base mais ne sont pas reanalysees tant que leur empreinte ne change pas.
 - La sortie initiale peut etre console/Markdown/CSV avant toute interface.
@@ -49,6 +54,7 @@ flowchart TD
 # Success signals
 - Une execution consecutive sans nouvelle offre ne retraite rien.
 - Une nouvelle offre pertinente apparait dans le top avec des raisons comprehensibles.
+- Une offre hors Paris/full remote est exclue ou marquee non eligible avant le top.
 - Une offre faible est classee bas avec les ecarts principaux visibles.
 - Ajouter une nouvelle source ne demande pas de modifier le stockage ni le scoring.
 - Les donnees stockees suffisent a alimenter plus tard un brouillon de CV ou lettre.
@@ -62,9 +68,13 @@ flowchart TD
 
 # Open questions
 - Quel format de profil initial est le plus pratique: YAML simple, JSON ou import depuis un CV existant?
-- Quelle source doit etre supportee en premier pour le MVP: fichier d'URLs, export manuel, flux public, ou connecteur Playwright controle?
+- Le premier provider doit-il etre confirme comme Welcome to the Jungle si l'acces API est disponible?
+- Quel perimetre exact signifie Paris: intramuros, Ile-de-France, ou distance maximale?
+- Full remote doit-il accepter uniquement France, Europe, ou monde entier?
+- Quel niveau de seniority cible le scoring initial?
 - Le scoring doit-il favoriser les competences actuelles, les competences a developper, ou un mix configurable?
+- La generation future doit-elle garder PPT/Word comme cible ou adopter un format intermediaire plus modulaire?
 
 # References
 - Product back-reference: `item_001_mvp_outil_local_de_veille_et_scoring_d_offres_d_emploi`
-- Task back-reference: (none yet)
+- Task back-reference: `task_001_mvp_outil_local_de_veille_et_scoring_d_offres_d_emploi`
