@@ -1,0 +1,73 @@
+version: initial-cv-2026-06-23
+candidate:
+  summary:
+    - Engineer-PhD in imaging and medical physics
+    - Signal processing, electronics and instrumentation background
+    - Hands-on system integration and hardware debugging
+skills:
+  primary:
+    - signal processing
+    - electronics
+    - instrumentation
+    - electrical architecture
+    - medical imaging
+    - ultrasound
+    - system integration
+    - hardware debugging
+    - FPGA
+    - Python
+  secondary:
+    - MATLAB
+    - C
+    - C++
+    - LabVIEW
+    - data science
+    - project management
+    - supplier coordination
+    - prototype validation
+languages:
+  fluent:
+    - French
+    - English
+  basic:
+    - German
+    - Spanish
+search:
+  target_roles:
+    - R&D engineer
+    - deep tech engineer
+    - electronics engineer
+    - electrical integration engineer
+    - system integration engineer
+    - signal processing engineer
+    - medical imaging engineer
+    - ultrasound engineer
+    - biomedical engineer
+    - FPGA engineer
+    - Python scientific tooling engineer
+    - hardware validation engineer
+    - prototype validation engineer
+    - technical project engineer
+exclusions:
+  hard_terms:
+    - internship
+    - apprenticeship
+    - alternance
+    - work-study
+  downrank_terms:
+    - ESN
+    - consulting
+    - conseil
+  military_terms:
+    - military
+    - defense
+    - defence
+    - army
+    - navy
+    - militaire
+  allowed_adjacent_terms:
+    - detection
+    - sensing
+    - imaging
+    - safety
+    - security

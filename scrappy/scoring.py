@@ -1,0 +1,148 @@
+from __future__ import annotations
+
+import re
+from collections.abc import Iterable
+
+from scrappy.models import Offer, ScoreResult
+from scrappy.profile import profile_terms
+
+
+def score_offer(offer: Offer, profile: dict) -> ScoreResult:
+    text = _offer_text(offer)
+    location_status, location_ok = _location_status(text)
+    exclusion = _hard_exclusion(text)
+    if exclusion:
+        return ScoreResult(
+            score=0,
+            eligible=False,
+            location_status=location_status,
+            seniority_status="excluded",
+            gaps=[exclusion],
+            risks=[exclusion],
+            reasons=[exclusion],
+        )
+
+    seniority_status, seniority_points, seniority_ok = _seniority_score(text)
+    primary = profile_terms(profile, "skills", "primary")
+    secondary = profile_terms(profile, "skills", "secondary")
+    role_terms = profile_terms(profile, "search", "target_roles")
+
+    primary_hits = _matched_terms(text, primary)
+    secondary_hits = _matched_terms(text, secondary)
+    role_hits = _matched_terms(text, role_terms)
+
+    score = 0
+    strengths: list[str] = []
+    gaps: list[str] = []
+    risks: list[str] = []
+    reasons: list[str] = []
+
+    if location_ok:
+        score += 30
+        strengths.append(f"location: {location_status}")
+    else:
+        gaps.append(f"location not eligible: {offer.location or offer.remote or 'unknown'}")
+
+    score += min(30, len(primary_hits) * 6)
+    score += min(15, len(secondary_hits) * 3)
+    score += min(10, len(role_hits) * 3)
+    score += seniority_points
+
+    if primary_hits:
+        strengths.append("primary skills: " + ", ".join(primary_hits[:6]))
+    else:
+        gaps.append("no primary skill match")
+    if secondary_hits:
+        strengths.append("secondary skills: " + ", ".join(secondary_hits[:5]))
+    if role_hits:
+        strengths.append("role terms: " + ", ".join(role_hits[:4]))
+    if not seniority_ok:
+        gaps.append(f"seniority not target: {seniority_status}")
+    else:
+        strengths.append(f"seniority: {seniority_status}")
+
+    if _contains_any(text, profile_terms(profile, "exclusions", "downrank_terms")):
+        score -= 15
+        risks.append("ESN/consulting signal")
+    if _contains_any(text, ["salary", "salaire", "compensation"]):
+        reasons.append("salary metadata present")
+    else:
+        reasons.append("salary not used as a primary criterion")
+
+    eligible = location_ok and seniority_ok
+    if not eligible:
+        score = min(score, 49)
+
+    return ScoreResult(
+        score=max(0, min(100, score)),
+        eligible=eligible,
+        location_status=location_status,
+        seniority_status=seniority_status,
+        strengths=strengths,
+        gaps=gaps,
+        risks=risks,
+        reasons=reasons,
+    )
+
+
+def _offer_text(offer: Offer) -> str:
+    return " ".join(
+        [
+            offer.title,
+            offer.company,
+            offer.location,
+            offer.remote,
+            offer.seniority,
+            offer.contract_type,
+            offer.description,
+        ]
+    ).lower()
+
+
+def _location_status(text: str) -> tuple[str, bool]:
+    if _contains_any(text, ["full remote", "fully remote", "remote first", "remote-first", "100% remote"]):
+        return "full remote", True
+    if re.search(r"\bparis\b", text):
+        return "paris intramuros assumed", True
+    if _contains_any(text, ["3 days remote", "3 remote days", "3 jours de teletravail", "3 jours de tt", "mostly remote"]):
+        return "substantial hybrid remote", True
+    if re.search(r"\b[345]\s*(days|jours).{0,20}(remote|teletravail|tt)\b", text):
+        return "substantial hybrid remote", True
+    if _contains_any(text, ["remote", "hybrid", "teletravail"]):
+        return "remote unclear", False
+    return "not paris or full remote", False
+
+
+def _seniority_score(text: str) -> tuple[str, int, bool]:
+    if _contains_any(text, ["internship", "intern ", "stage", "apprenticeship", "alternance", "work-study"]):
+        return "internship/apprenticeship", 0, False
+    if _contains_any(text, ["junior", "entry level", "entry-level", "graduate"]):
+        return "junior", 0, False
+    if _contains_any(text, ["head of", "lead", "principal", "staff", "senior", "manager"]):
+        return "senior_plus", 15, True
+    if _contains_any(text, ["confirmed", "confirme", "experienced", "mid-level", "mid level"]):
+        return "confirmed", 12, True
+    return "unspecified", 6, True
+
+
+def _hard_exclusion(text: str) -> str | None:
+    if _contains_any(text, ["internship", "apprenticeship", "alternance", "work-study"]):
+        return "excluded internship/apprenticeship"
+    military = _contains_any(text, ["military", "defense", "defence", "army", "navy", "air force", "armement", "militaire"])
+    adjacent = _contains_any(text, ["detection", "sensing", "imaging", "safety", "security"])
+    if military and not adjacent:
+        return "excluded direct military role"
+    return None
+
+
+def _matched_terms(text: str, terms: Iterable[str]) -> list[str]:
+    hits = []
+    for term in terms:
+        normalized = str(term).strip().lower()
+        if normalized and normalized in text:
+            hits.append(str(term))
+    return hits
+
+
+def _contains_any(text: str, terms: Iterable[str]) -> bool:
+    return any(str(term).lower() in text for term in terms)

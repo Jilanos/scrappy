@@ -1,13 +1,14 @@
 ## task_001_mvp_outil_local_de_veille_et_scoring_d_offres_d_emploi - MVP outil local de veille et scoring d'offres d'emploi
 > From version: 1.0.0
 > Schema version: 1.0
-> Status: Ready
-> Understanding: 97
-> Confidence: 92
-> Progress: 0
+> Status: In progress
+> Understanding: 98
+> Confidence: 88
+> Progress: 75
 > Complexity: Medium
 > Theme: Implementation delivery
 > Reminder: Update status/understanding/confidence/progress and linked request/backlog references when you edit this doc.
+> Owner: codex
 
 # Definition of Done (DoD)
 - [ ] CLI entrypoints for database initialization and run execution are implemented or scaffolded.
@@ -49,7 +50,9 @@
 - Choose document generation direction for later phases: keep PPT/Word targets or move to HTML/Markdown/LaTeX templates.
 
 # Report
-- Initial task refined with provider, location, scoring and future document-generation constraints. Implementation is not started in this commit.
+- Implementation scaffold is in place: Python CLI, SQLite schema, profile seed, WTTJ public-page connector boundary, deterministic scoring, console output, XLSX report, rescore command and focused tests.
+- Provider investigation found that the official WTTJ all-jobs API requires dedicated partnership/scope, while the current public search page can render without job cards in initial HTML. Direct discovery is therefore implemented as an isolated public-page connector but may return zero offers until a stable API, public endpoint or third-party API is selected.
+- Task remains in progress because the provider data source still needs a reliable live discovery path before closeout.
 
 # AI Context
 - Summary: Implement the local MVP skeleton for job-offer ingestion, SQLite deduplication, profile scoring and ranked output.
