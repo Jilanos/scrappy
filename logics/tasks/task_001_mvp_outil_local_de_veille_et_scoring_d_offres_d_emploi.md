@@ -2,8 +2,8 @@
 > From version: 1.0.0
 > Schema version: 1.0
 > Status: Ready
-> Understanding: 95
-> Confidence: 90
+> Understanding: 97
+> Confidence: 92
 > Progress: 0
 > Complexity: Medium
 > Theme: Implementation delivery
@@ -14,9 +14,12 @@
 - [ ] SQLite schema covers offers, source observations, runs, analysis results and scoring reasons.
 - [ ] User profile schema is documented with an example derived from a CV.
 - [ ] One initial provider connector is implemented or scaffolded, preferably API-first and without manual export dependency.
-- [ ] Location gating accepts Paris and full remote and rejects or marks non-eligible locations.
+- [ ] Location gating accepts Paris intramuros, full remote, and substantial-remote hybrid roles outside Paris; it rejects or marks non-eligible low-remote onsite roles outside Paris.
 - [ ] Scoring covers skill match and seniority match, with salary treated as optional metadata.
-- [ ] The ranked output returns a top 5 initial shortlist.
+- [ ] The ranked output returns a top 5 initial shortlist in console and XLSX formats.
+- [ ] Internship/apprenticeship exclusions are implemented.
+- [ ] ESN roles are downranked by default.
+- [ ] Direct military roles are excluded while adjacent detection/sensing/imaging/security roles remain possible.
 - [ ] A future rescore path is designed or scaffolded for rescoring stored history after profile/scoring improvements.
 - [ ] Deduplication and scoring behavior are covered by focused tests or documented validation steps.
 - [ ] Logics validation passes.
@@ -28,7 +31,7 @@
 - AC1: Une commande documentee initialise ou migre la base locale.
 - AC2: Une commande documentee execute une collecte depuis le provider initial, ajoute uniquement les offres inconnues ou modifiees, et trace l'execution.
 - AC3: Les offres nouvelles sont filtrees par localisation obligatoire puis analysees contre un profil local derive du CV; elles stockent score, ecarts, raisons et date d'analyse.
-- AC4: Le top de sortie trie les offres eligibles par pertinence, garde un top 5 initial et affiche les informations necessaires pour decider quoi lire ou postuler.
+- AC4: Le top de sortie trie les offres eligibles par pertinence, garde un top 5 initial et affiche les informations necessaires pour decider quoi lire ou postuler dans la console et dans un XLSX.
 - AC5: Les connecteurs de source sont decouples du pipeline d'analyse afin d'en ajouter ou remplacer un sans modifier le scoring.
 - AC6: Les limites des plateformes et les modes d'entree acceptables sont documentes dans le README ou les specs.
 
@@ -39,11 +42,10 @@
 - Run `logics-manager flow finish task task_001_mvp_outil_local_de_veille_et_scoring_d_offres_d_emploi.md` after implementation.
 
 # Open implementation questions
-- Confirm the first provider and whether official API credentials are available.
-- Define the first search query set: roles, keywords, excluded terms and target sectors.
-- Define the exact accepted location vocabulary for Paris and full remote.
-- Define seniority target and tolerated adjacent levels.
-- Choose initial output format: console, Markdown, CSV, or combined.
+- Confirm the first provider after checking whether official API access, public-page ingestion, or a third-party API is feasible.
+- Define the exact source query mapping from the CV-derived roles and keywords.
+- Define how to detect "substantial remote" in provider text; initial assumption is at least 3 remote days per week or equivalent wording.
+- Choose the XLSX column schema for ranked output.
 - Choose document generation direction for later phases: keep PPT/Word targets or move to HTML/Markdown/LaTeX templates.
 
 # Report

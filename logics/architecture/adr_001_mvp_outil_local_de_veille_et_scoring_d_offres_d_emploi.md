@@ -1,6 +1,6 @@
 ## adr_001_mvp_outil_local_de_veille_et_scoring_d_offres_d_emploi - MVP outil local de veille et scoring d'offres d'emploi
 > Date: 2026-06-23
-> Status: Proposed
+> Status: Accepted
 > Related request: `req_000_mvp_job_reviewer`
 > Related backlog: `item_001_mvp_outil_local_de_veille_et_scoring_d_offres_d_emploi`
 > Related task: (none yet)
@@ -48,14 +48,17 @@ flowchart TD
   - presentation that renders the ranked shortlist.
 - Deduplicate by canonical URL when possible, source-specific external ID when available, and content fingerprint as a fallback.
 - Treat platform-specific ingestion as replaceable adapters, not as core domain logic.
-- Apply location gating before ranking: Paris or full remote is mandatory.
+- Apply location gating before ranking: Paris intramuros, full remote, or substantial-remote hybrid is mandatory.
 - Treat salary as optional metadata rather than a primary score dimension.
+- Generate XLSX as the primary persisted review artifact and console output as the immediate operator feedback.
+- Use the CV-derived profile spec as the initial search and scoring seed, without storing private contact data in the public repo.
 - Include a rescore capability in the architecture so historical offers can be rescored after the profile/scoring model improves.
 
 # Consequences
 - The first implementation can be useful with a simple source adapter such as a file of URLs or saved HTML before robust platform adapters exist.
 - If official API access is unavailable, the provider connector may need a public-page ingestion adapter, a third-party data API, or a later provider switch.
 - SQLite keeps setup lightweight and makes repeated local runs deterministic.
+- XLSX output adds a small dependency but matches the target review workflow better than CSV alone.
 - Future generation of CV and cover letters can use stored offer text, extracted requirements, scoring reasons and selected document template metadata.
 - Platform adapters can fail or require maintenance without corrupting the database or scoring model.
 - If richer semantic matching is added later, it can be introduced behind the scoring boundary without changing ingestion.

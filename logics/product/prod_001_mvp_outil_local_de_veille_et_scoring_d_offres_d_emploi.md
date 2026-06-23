@@ -1,6 +1,6 @@
 ## prod_001_mvp_outil_local_de_veille_et_scoring_d_offres_d_emploi - MVP outil local de veille et scoring d'offres d'emploi
 > Date: 2026-06-23
-> Status: Active
+> Status: Accepted
 > Related request: `req_000_mvp_job_reviewer`
 > Related backlog: `item_001_mvp_outil_local_de_veille_et_scoring_d_offres_d_emploi`
 > Related task: `task_001_mvp_outil_local_de_veille_et_scoring_d_offres_d_emploi`
@@ -45,16 +45,17 @@ flowchart TD
 - Le MVP est local-first: donnees et profil restent sur la machine de l'utilisateur.
 - Le MVP est provider-first: un seul provider initial, probablement Welcome to the Jungle si l'acces API ou pages publiques est viable.
 - Le premier scoring doit etre interpretable avant d'etre intelligent: une heuristique transparente est acceptable si elle expose ses raisons.
-- La localisation est un critere bloquant: Paris ou full remote.
+- La localisation est un critere bloquant: Paris intramuros, full remote, ou hybride hors Paris avec teletravail substantiel.
 - Le top initial conserve 5 offres, puis les seuils seront calibres avec l'usage.
 - Les connecteurs de sources sont des modules remplacables, car LinkedIn, Welcome to the Jungle et Indeed changent leurs pages et politiques.
 - Les offres deja vues restent visibles dans la base mais ne sont pas reanalysees tant que leur empreinte ne change pas.
-- La sortie initiale peut etre console/Markdown/CSV avant toute interface.
+- La sortie initiale combine retour console et fichier XLSX.
+- Les informations personnelles de contact extraites du CV ne doivent pas etre versionnees dans le depot public.
 
 # Success signals
 - Une execution consecutive sans nouvelle offre ne retraite rien.
 - Une nouvelle offre pertinente apparait dans le top avec des raisons comprehensibles.
-- Une offre hors Paris/full remote est exclue ou marquee non eligible avant le top.
+- Une offre hors Paris/full remote/substantial-remote hybrid est exclue ou marquee non eligible avant le top.
 - Une offre faible est classee bas avec les ecarts principaux visibles.
 - Ajouter une nouvelle source ne demande pas de modifier le stockage ni le scoring.
 - Les donnees stockees suffisent a alimenter plus tard un brouillon de CV ou lettre.
@@ -68,10 +69,9 @@ flowchart TD
 
 # Open questions
 - Quel format de profil initial est le plus pratique: YAML simple, JSON ou import depuis un CV existant?
-- Le premier provider doit-il etre confirme comme Welcome to the Jungle si l'acces API est disponible?
-- Quel perimetre exact signifie Paris: intramuros, Ile-de-France, ou distance maximale?
-- Full remote doit-il accepter uniquement France, Europe, ou monde entier?
-- Quel niveau de seniority cible le scoring initial?
+- Le premier provider doit-il etre confirme comme Welcome to the Jungle, ou une API tierce rend-elle Indeed/LinkedIn plus simple en pratique?
+- Quel seuil exact definit le teletravail substantiel: 3 jours/semaine, 60%, ou texte explicite "mostly remote"?
+- Quels roles derives du CV doivent etre prioritaires dans la premiere collecte?
 - Le scoring doit-il favoriser les competences actuelles, les competences a developper, ou un mix configurable?
 - La generation future doit-elle garder PPT/Word comme cible ou adopter un format intermediaire plus modulaire?
 

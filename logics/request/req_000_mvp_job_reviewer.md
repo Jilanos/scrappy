@@ -2,8 +2,8 @@
 > From version: 1.0.0
 > Schema version: 1.0
 > Status: Draft
-> Understanding: 95
-> Confidence: 90
+> Understanding: 97
+> Confidence: 92
 > Complexity: Medium
 > Theme: Operator workflow
 > Reminder: Update status/understanding/confidence and linked backlog/task references when you edit this doc.
@@ -24,12 +24,14 @@
 - Le scoring initial doit surtout mesurer skill match et seniority match. Le salaire est optionnel et peu structurant pour le marche francais, car il est rarement indique.
 - Le MVP partira d'un panel de base pour construire l'outil. Plus tard, quand le profil et le scoring seront plus precis, l'historique complet devra pouvoir etre rescored.
 - La future generation de documents partira aujourd'hui d'un support PPT permettant de former un PDF pour le CV et d'un document Word pour la lettre. Des formats plus modulaires comme HTML, Markdown ou LaTeX restent ouverts si cela simplifie la generation.
+- Le premier profil de base est extrait du CV local fourni par l'utilisateur. Les donnees de contact personnelles ne doivent pas etre versionnees dans le depot public.
+- La sortie de revue cible un fichier XLSX accompagne d'un retour console.
 
 # Acceptance criteria
 - AC1: Une execution locale peut ingerer des offres nouvelles depuis un provider initial configure, idealement par API officielle ou sinon via pages publiques autorisees, et les enregistrer dans une base SQLite.
 - AC2: Une offre deja rencontree est reconnue et n'est pas analysee une seconde fois, sauf si son contenu source a change.
 - AC3: Chaque nouvelle offre analysee recoit un score de pertinence, un niveau d'ecart au profil et des raisons lisibles.
-- AC4: La sortie presente un top 5 initial des offres avec titre, entreprise, source, URL, score, eligibilite de localisation, points forts, ecarts et prochaine action recommandee.
+- AC4: La sortie presente un top 5 initial des offres dans un retour console et un fichier XLSX, avec titre, entreprise, source, URL, score, eligibilite de localisation, points forts, ecarts et prochaine action recommandee.
 - AC5: Le MVP documente clairement les limites d'integration avec LinkedIn, Welcome to the Jungle et Indeed, et isole les connecteurs pour pouvoir les remplacer.
 - AC6: La generation automatique de CV et lettre de motivation est hors MVP, mais les donnees stockees conservent les elements necessaires pour cette phase.
 
@@ -47,6 +49,7 @@
 - Product brief: `logics/product/prod_001_mvp_outil_local_de_veille_et_scoring_d_offres_d_emploi.md`
 - Architecture decision: `logics/architecture/adr_001_mvp_outil_local_de_veille_et_scoring_d_offres_d_emploi.md`
 - Backlog slice: `logics/backlog/item_001_mvp_outil_local_de_veille_et_scoring_d_offres_d_emploi.md`
+- Initial profile spec: `logics/specs/spec_001_initial_profile_and_search_criteria.md`
 
 # AI Context
 - Summary: MVP local pour collecter des offres d'emploi, dedupliquer les annonces vues, scorer les nouvelles offres contre un profil utilisateur et proposer un top exploitable.
