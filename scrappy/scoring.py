@@ -117,9 +117,37 @@ def _location_status(offer: Offer) -> tuple[str, bool]:
         return "full remote", True
     if re.search(r"\bparis\b", location_text):
         return "paris intramuros", True
+    if _substantial_remote(remote_text):
+        return "substantial remote hybrid", True
     if _contains_any(location_text, ["remote", "hybrid", "teletravail"]):
         return "remote unclear", False
     return "not paris or full remote", False
+
+
+def _substantial_remote(text: str) -> bool:
+    substantial_terms = [
+        "mostly remote",
+        "mainly remote",
+        "majority remote",
+        "remote majority",
+        "hybrid remote-first",
+        "3 days remote",
+        "4 days remote",
+        "3 remote days",
+        "4 remote days",
+        "3 jours de teletravail",
+        "4 jours de teletravail",
+        "3j teletravail",
+        "4j teletravail",
+        "teletravail majoritaire",
+        "majorite teletravail",
+    ]
+    if _contains_any(text, substantial_terms):
+        return True
+    return bool(
+        re.search(r"\b[34]\s*(?:days?|jours?|j)\s+(?:of\s+)?(?:remote|teletravail|wfh)\b", text)
+        or re.search(r"\b(?:remote|teletravail|wfh)\s*(?:work\s*)?[x:/-]?\s*[34]\s*(?:days?|jours?|j)\b", text)
+    )
 
 
 def _contract_status(text: str) -> tuple[str, bool]:

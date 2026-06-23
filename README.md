@@ -11,7 +11,7 @@ The MVP goal is to collect configured job offers, store every encountered offer 
 - CV-derived profile seed in `examples/profile.yaml`.
 - WTTJ public Algolia connector.
 - Explainable deterministic scoring:
-  - mandatory location gate: Paris from the normalized location field, or explicit full remote;
+  - mandatory location gate: Paris from the normalized location field, explicit full remote, or substantial-remote hybrid;
   - mandatory contract gate: CDI/full-time;
   - mandatory domain primary skill match; Python alone is treated as a support skill;
   - seniority match with roles above 6 years of required experience excluded;

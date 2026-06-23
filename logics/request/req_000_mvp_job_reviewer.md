@@ -1,7 +1,7 @@
 ## req_000_mvp_job_reviewer - MVP outil local de veille et scoring d'offres d'emploi
 > From version: 1.0.0
 > Schema version: 1.0
-> Status: Draft
+> Status: Done
 > Understanding: 97
 > Confidence: 92
 > Complexity: Medium

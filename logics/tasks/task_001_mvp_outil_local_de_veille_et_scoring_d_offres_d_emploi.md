@@ -1,29 +1,29 @@
 ## task_001_mvp_outil_local_de_veille_et_scoring_d_offres_d_emploi - MVP outil local de veille et scoring d'offres d'emploi
 > From version: 1.0.0
 > Schema version: 1.0
-> Status: In progress
+> Status: Done
 > Understanding: 99
 > Confidence: 92
-> Progress: 90
+> Progress: 100%
 > Complexity: Medium
 > Theme: Implementation delivery
 > Reminder: Update status/understanding/confidence/progress and linked request/backlog references when you edit this doc.
 > Owner: codex
 
 # Definition of Done (DoD)
-- [ ] CLI entrypoints for database initialization and run execution are implemented or scaffolded.
-- [ ] SQLite schema covers offers, source observations, runs, analysis results and scoring reasons.
-- [ ] User profile schema is documented with an example derived from a CV.
-- [ ] One initial provider connector is implemented or scaffolded, preferably API-first and without manual export dependency.
-- [ ] Location gating accepts Paris intramuros, full remote, and substantial-remote hybrid roles outside Paris; it rejects or marks non-eligible low-remote onsite roles outside Paris.
-- [ ] Scoring covers skill match and seniority match, with salary treated as optional metadata.
-- [ ] The ranked output returns a top 5 initial shortlist in console and XLSX formats.
-- [ ] Internship/apprenticeship exclusions are implemented.
-- [ ] ESN roles are downranked by default.
-- [ ] Direct military roles are excluded while adjacent detection/sensing/imaging/security roles remain possible.
-- [ ] A future rescore path is designed or scaffolded for rescoring stored history after profile/scoring improvements.
-- [ ] Deduplication and scoring behavior are covered by focused tests or documented validation steps.
-- [ ] Logics validation passes.
+- [x] CLI entrypoints for database initialization and run execution are implemented or scaffolded.
+- [x] SQLite schema covers offers, source observations, runs, analysis results and scoring reasons.
+- [x] User profile schema is documented with an example derived from a CV.
+- [x] One initial provider connector is implemented or scaffolded, preferably API-first and without manual export dependency.
+- [x] Location gating accepts Paris intramuros, full remote, and substantial-remote hybrid roles outside Paris; it rejects or marks non-eligible low-remote onsite roles outside Paris.
+- [x] Scoring covers skill match and seniority match, with salary treated as optional metadata.
+- [x] The ranked output returns a top 5 initial shortlist in console and XLSX formats.
+- [x] Internship/apprenticeship exclusions are implemented.
+- [x] ESN roles are downranked by default.
+- [x] Direct military roles are excluded while adjacent detection/sensing/imaging/security roles remain possible.
+- [x] A future rescore path is designed or scaffolded for rescoring stored history after profile/scoring improvements.
+- [x] Deduplication and scoring behavior are covered by focused tests or documented validation steps.
+- [x] Logics validation passes.
 
 # Backlog
 - `item_001_mvp_outil_local_de_veille_et_scoring_d_offres_d_emploi`
@@ -41,6 +41,8 @@
 - Run `logics-manager audit --group-by-doc`.
 - Run project tests once the implementation exists.
 - Run `logics-manager flow finish task task_001_mvp_outil_local_de_veille_et_scoring_d_offres_d_emploi.md` after implementation.
+- Finish workflow executed on 2026-06-23.
+- Linked backlog/request close verification passed.
 
 # Open implementation questions
 - Confirm the first provider after checking whether official API access, public-page ingestion, or a third-party API is feasible.
@@ -54,6 +56,19 @@
 - Provider investigation found that the official WTTJ all-jobs API requires dedicated partnership/scope, while WTTJ also exposes public Algolia search traffic through the website.
 - Direct discovery is now implemented through the public Algolia endpoint `POST https://csekhvms53-dsn.algolia.net/1/indexes/*/queries`, app id `CSEKHVMS53`, index `wk_cms_jobs_production`, with browser-like Origin/Referer headers and the website public search-only key.
 - Smoke validation with query `electronics engineer` discovered 20 offers and produced DB plus XLSX output.
+- Closed remaining MVP gap by accepting substantial-remote hybrid offers outside Paris when provider text explicitly indicates 3+ remote days per week or equivalent majority-remote wording, while keeping vague hybrid outside Paris non-eligible.
+- Validation on 2026-06-23: `python3 -m pytest` passed with 17 tests; `logics-manager lint --require-status`, `logics-manager audit --group-by-doc`, and `logics-manager health` passed with only deferred traceability warnings before task closeout.
+- Finished on 2026-06-23.
+- Linked backlog item(s): `item_001_mvp_outil_local_de_veille_et_scoring_d_offres_d_emploi`
+- Related request(s): `req_000_mvp_job_reviewer`
+
+# AC Traceability
+- AC1 -> Database initialization command. Proof: `scrappy/cli.py` implements `init-db`; `scrappy/storage.py` creates schema and migration marker.
+- AC2 -> Collection run and deduplication. Proof: `scrappy/cli.py` implements `run`; `scrappy/storage.py` upserts offers by source id/canonical URL and records `source_observations`.
+- AC3 -> Location-gated analysis against local profile. Proof: `scrappy/scoring.py` applies Paris/full-remote/substantial-hybrid gates, contract gates, skill match and seniority match; `examples/profile.yaml` provides the profile seed.
+- AC4 -> Ranked top output. Proof: `scrappy/cli.py` prints eligible top offers; `scrappy/reporting.py` writes XLSX `all_scored` and `rejected` sheets.
+- AC5 -> Connector separation. Proof: `scrappy/connectors/wttj.py` exposes provider discovery independently from CLI scoring/storage.
+- AC6 -> Platform limits documented. Proof: `README.md` documents WTTJ provider status, public Algolia endpoint, third-party fallback and replaceable connector boundary.
 
 # AI Context
 - Summary: Implement the local MVP skeleton for job-offer ingestion, SQLite deduplication, profile scoring and ranked output.

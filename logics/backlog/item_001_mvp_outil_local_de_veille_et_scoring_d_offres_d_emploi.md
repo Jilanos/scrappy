@@ -1,10 +1,10 @@
 ## item_001_mvp_outil_local_de_veille_et_scoring_d_offres_d_emploi - MVP outil local de veille et scoring d'offres d'emploi
 > From version: 1.0.0
 > Schema version: 1.0
-> Status: Ready
+> Status: Done
 > Understanding: 99
 > Confidence: 92
-> Progress: 90
+> Progress: 100%
 > Complexity: High
 > Theme: Operator workflow and runtime integration
 > Reminder: Update status/understanding/confidence/progress and linked request/task references when you edit this doc.
@@ -87,6 +87,7 @@ Les recherches d'emploi sur plusieurs plateformes produisent beaucoup d'offres r
 - Hybrid rationale: Derived from request `req_000_mvp_job_reviewer` and kept bounded to one coherent delivery slice.
 - Source file: `logics/request/req_000_mvp_job_reviewer.md`.
 - Generated locally by logics-manager, then refined for the job-search MVP.
+- Task `task_001_mvp_outil_local_de_veille_et_scoring_d_offres_d_emploi` was finished via `logics-manager flow finish task` on 2026-06-23.
 
 # Tasks
 - `task_001_mvp_outil_local_de_veille_et_scoring_d_offres_d_emploi`

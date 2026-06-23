@@ -64,6 +64,27 @@ def test_rejects_unclear_remote_outside_paris() -> None:
     assert result.location_status == "remote unclear"
 
 
+def test_accepts_substantial_remote_hybrid_outside_paris() -> None:
+    profile = load_profile("examples/profile.yaml")
+    offer = Offer(
+        source="fixture",
+        source_id="3b",
+        url="https://example.test/substantial-hybrid",
+        title="Confirmed Electronics Engineer",
+        company="Tech",
+        location="Lyon",
+        remote="Hybrid",
+        seniority="confirmed",
+        contract_type="Full-Time",
+        description="Electronics and signal processing role with 3 days remote per week.",
+    )
+
+    result = score_offer(offer, profile)
+
+    assert result.eligible
+    assert result.location_status == "substantial remote hybrid"
+
+
 def test_rejects_missing_cdi_or_full_time_contract() -> None:
     profile = load_profile("examples/profile.yaml")
     offer = Offer(
