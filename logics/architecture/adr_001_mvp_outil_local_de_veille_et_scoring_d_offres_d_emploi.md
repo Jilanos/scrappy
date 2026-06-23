@@ -4,7 +4,7 @@
 > Related request: `req_000_mvp_job_reviewer`
 > Related backlog: `item_001_mvp_outil_local_de_veille_et_scoring_d_offres_d_emploi`
 > Related task: (none yet)
-> Drivers: local-first data, API-first provider, repeatable runs, replaceable connectors, explainable scoring, future document generation
+> Drivers: local-first data, public Algolia provider, repeatable runs, replaceable connectors, explainable scoring, future document generation
 > Reminder: Update status, linked refs, decision rationale, consequences, and follow-up work when you edit this doc.
 
 # Overview
@@ -57,7 +57,7 @@ flowchart TD
 # Consequences
 - The first implementation can be useful with a simple source adapter such as a file of URLs or saved HTML before robust platform adapters exist.
 - If official API access is unavailable, the provider connector may need a public-page ingestion adapter, a third-party data API, or a later provider switch.
-- Initial implementation confirms this risk: WTTJ public pages are accessible, but search results are not guaranteed in the initial HTML. The core keeps the provider boundary isolated so a third-party API can replace discovery without changing storage or scoring.
+- Initial implementation confirms this risk: WTTJ public pages are accessible, but search results are not guaranteed in the initial HTML. The first live discovery path uses the public Algolia endpoint behind WTTJ search (`CSEKHVMS53`, `wk_cms_jobs_production`) with browser-like headers. The core keeps the provider boundary isolated so an official token or third-party API can replace discovery without changing storage or scoring.
 - SQLite keeps setup lightweight and makes repeated local runs deterministic.
 - XLSX output adds a small dependency but matches the target review workflow better than CSV alone.
 - Future generation of CV and cover letters can use stored offer text, extracted requirements, scoring reasons and selected document template metadata.

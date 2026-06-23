@@ -55,7 +55,12 @@ The first provider target is Welcome to the Jungle.
 Current finding:
 
 - The official WelcomeKit endpoint that lists all jobs requires a dedicated partnership and `su_jobs_r` scope.
-- Public WTTJ job pages are accessible without authentication, but the current search page can render without job cards in the initial HTML. The connector is isolated and tested against public job-link markup, but direct discovery may return zero results until a stable public endpoint or third-party API is selected.
+- WTTJ search uses a public Algolia search endpoint behind the website. The connector currently calls:
+  - `POST https://csekhvms53-dsn.algolia.net/1/indexes/*/queries`
+  - app id: `CSEKHVMS53`
+  - index: `wk_cms_jobs_production`
+  - public search-only API key from the website bundle
+  - required browser-like headers: `Origin`, `Referer`, `X-Algolia-Application-Id`, `X-Algolia-API-Key`
 - Third-party APIs remain an accepted fallback because no privileged provider credentials are available.
 
 Initial Logics documents:

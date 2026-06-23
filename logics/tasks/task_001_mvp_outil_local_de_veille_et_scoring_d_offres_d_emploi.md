@@ -2,9 +2,9 @@
 > From version: 1.0.0
 > Schema version: 1.0
 > Status: In progress
-> Understanding: 98
-> Confidence: 88
-> Progress: 75
+> Understanding: 99
+> Confidence: 92
+> Progress: 90
 > Complexity: Medium
 > Theme: Implementation delivery
 > Reminder: Update status/understanding/confidence/progress and linked request/backlog references when you edit this doc.
@@ -51,8 +51,9 @@
 
 # Report
 - Implementation scaffold is in place: Python CLI, SQLite schema, profile seed, WTTJ public-page connector boundary, deterministic scoring, console output, XLSX report, rescore command and focused tests.
-- Provider investigation found that the official WTTJ all-jobs API requires dedicated partnership/scope, while the current public search page can render without job cards in initial HTML. Direct discovery is therefore implemented as an isolated public-page connector but may return zero offers until a stable API, public endpoint or third-party API is selected.
-- Task remains in progress because the provider data source still needs a reliable live discovery path before closeout.
+- Provider investigation found that the official WTTJ all-jobs API requires dedicated partnership/scope, while WTTJ also exposes public Algolia search traffic through the website.
+- Direct discovery is now implemented through the public Algolia endpoint `POST https://csekhvms53-dsn.algolia.net/1/indexes/*/queries`, app id `CSEKHVMS53`, index `wk_cms_jobs_production`, with browser-like Origin/Referer headers and the website public search-only key.
+- Smoke validation with query `electronics engineer` discovered 20 offers and produced DB plus XLSX output.
 
 # AI Context
 - Summary: Implement the local MVP skeleton for job-offer ingestion, SQLite deduplication, profile scoring and ranked output.

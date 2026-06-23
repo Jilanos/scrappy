@@ -2,16 +2,21 @@ from __future__ import annotations
 
 import hashlib
 import html
+import json
 import re
 from dataclasses import dataclass
 from typing import Iterable
-from urllib.parse import quote_plus, urljoin
+from urllib.parse import quote_plus, urlencode, urljoin
 from urllib.request import Request, urlopen
 
 from scrappy.models import Offer
 
 
 WTTJ_BASE = "https://www.welcometothejungle.com"
+ALGOLIA_APP_ID = "CSEKHVMS53"
+ALGOLIA_SEARCH_KEY = "4bd8f6215d0cc52b26430765769e65a0"
+ALGOLIA_ENDPOINT = "https://csekhvms53-dsn.algolia.net/1/indexes/*/queries"
+ALGOLIA_JOBS_INDEX = "wk_cms_jobs_production"
 
 
 @dataclass(frozen=True)
@@ -22,22 +27,85 @@ class WttjPublicConnector:
 
     @property
     def name(self) -> str:
-        return "wttj_public"
+        return "wttj_algolia"
 
     def discover(self, queries: Iterable[str], max_pages: int = 1) -> list[Offer]:
         offers: dict[str, Offer] = {}
         for query in queries:
             for page in range(1, max_pages + 1):
-                url = self.search_url(query, page)
-                body = self._fetch(url)
-                for offer in self.parse_search_html(body, source_url=url):
+                for offer in self.search(query, page=page - 1):
                     offers[offer.source_id] = offer
         return list(offers.values())
+
+    def search(self, query: str, page: int = 0, hits_per_page: int = 20) -> list[Offer]:
+        params = urlencode({"query": query, "hitsPerPage": hits_per_page, "page": page})
+        payload = json.dumps(
+            {"requests": [{"indexName": ALGOLIA_JOBS_INDEX, "params": params}]}
+        ).encode("utf-8")
+        request = Request(
+            ALGOLIA_ENDPOINT,
+            data=payload,
+            headers={
+                "Content-Type": "application/json",
+                "Origin": WTTJ_BASE,
+                "Referer": self.search_url(query, page + 1),
+                "User-Agent": self.user_agent,
+                "X-Algolia-API-Key": ALGOLIA_SEARCH_KEY,
+                "X-Algolia-Application-Id": ALGOLIA_APP_ID,
+            },
+        )
+        with urlopen(request, timeout=self.timeout_seconds) as response:
+            data = json.loads(response.read().decode("utf-8"))
+        hits = data.get("results", [{}])[0].get("hits", [])
+        return [self.offer_from_hit(hit) for hit in hits]
 
     def search_url(self, query: str, page: int = 1) -> str:
         return (
             f"{WTTJ_BASE}/{self.locale}/jobs"
             f"?query={quote_plus(query)}&aroundQuery={quote_plus('Paris, France')}&page={page}"
+        )
+
+    def offer_from_hit(self, hit: dict) -> Offer:
+        org = hit.get("organization") or {}
+        office = hit.get("office") or {}
+        offices = hit.get("offices") or []
+        first_office = office or (offices[0] if offices else {})
+        org_slug = org.get("slug") or (hit.get("website") or {}).get("reference") or "unknown"
+        job_slug = hit.get("slug") or hit.get("reference") or str(hit.get("objectID") or "")
+        url = f"{WTTJ_BASE}/{self.locale}/companies/{org_slug}/jobs/{job_slug}"
+        title = str(hit.get("name") or "")
+        company = str(org.get("name") or "")
+        location = _office_location(first_office)
+        remote = str(hit.get("remote") or "")
+        seniority = _seniority_from_experience(hit)
+        contract_type = _localized(hit.get("contract_type_names")) or str(hit.get("contract_type") or "")
+        description = "\n\n".join(
+            part
+            for part in [
+                title,
+                company,
+                str(hit.get("profile") or ""),
+                str(hit.get("description") or ""),
+                _sectors(hit),
+            ]
+            if part
+        )
+        source_id = str(hit.get("objectID") or hit.get("reference") or f"{org_slug}:{job_slug}")
+        content_hash = hashlib.sha256(
+            json.dumps(hit, sort_keys=True, ensure_ascii=False).encode("utf-8")
+        ).hexdigest()
+        return Offer(
+            source=self.name,
+            source_id=source_id,
+            url=url,
+            title=title,
+            company=company,
+            location=location,
+            remote=remote,
+            seniority=seniority,
+            contract_type=contract_type,
+            description=description,
+            content_hash=content_hash,
         )
 
     def parse_search_html(self, body: str, source_url: str) -> list[Offer]:
@@ -104,3 +172,42 @@ def _guess_title_company(context: str) -> tuple[str, str]:
     title = parts[0] if parts else ""
     company = parts[1] if len(parts) > 1 else ""
     return title[:160], company[:120]
+
+
+def _office_location(office: dict) -> str:
+    parts = [
+        office.get("city"),
+        office.get("district"),
+        office.get("state"),
+        office.get("country"),
+    ]
+    return ", ".join(str(part) for part in parts if part)
+
+
+def _seniority_from_experience(hit: dict) -> str:
+    minimum = hit.get("experience_level_minimum")
+    if isinstance(minimum, int):
+        if minimum >= 5:
+            return "senior"
+        if minimum >= 2:
+            return "confirmed"
+        return "junior"
+    return ""
+
+
+def _localized(value: object, locale: str = "en") -> str:
+    if isinstance(value, dict):
+        return str(value.get(locale) or value.get("fr") or next(iter(value.values()), ""))
+    return ""
+
+
+def _sectors(hit: dict) -> str:
+    names = hit.get("sectors_name")
+    if not isinstance(names, dict):
+        return ""
+    values = names.get("en") or names.get("fr") or []
+    output: list[str] = []
+    for item in values:
+        if isinstance(item, dict):
+            output.extend(str(value) for value in item.values())
+    return ", ".join(output)
