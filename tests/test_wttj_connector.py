@@ -56,4 +56,6 @@ def test_discover_paginates_until_target_count() -> None:
     offers = FixtureConnector().discover(["electronics", "signal"], max_pages=3, target_count=5)
 
     assert len(offers) == 6
-    assert offers[-1].source_id == "electronics-2-1"
+    assert offers[0].source_id == "electronics-0-0"
+    assert offers[2].source_id == "signal-0-0"
+    assert offers[-1].source_id == "electronics-1-1"

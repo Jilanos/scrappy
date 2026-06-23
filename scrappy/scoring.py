@@ -7,9 +7,12 @@ from scrappy.models import Offer, ScoreResult
 from scrappy.profile import profile_terms
 
 
+SUPPORT_ONLY_PRIMARY_SKILLS = {"python"}
+
+
 def score_offer(offer: Offer, profile: dict) -> ScoreResult:
     text = _offer_text(offer)
-    location_status, location_ok = _location_status(text)
+    location_status, location_ok = _location_status(offer)
     contract_status, contract_ok = _contract_status(text)
     exclusion = _hard_exclusion(text)
     if exclusion:
@@ -23,7 +26,7 @@ def score_offer(offer: Offer, profile: dict) -> ScoreResult:
             reasons=[exclusion],
         )
 
-    seniority_status, seniority_points, seniority_ok = _seniority_score(text)
+    seniority_status, seniority_points, seniority_ok = _seniority_score(offer)
     primary = profile_terms(profile, "skills", "primary")
     secondary = profile_terms(profile, "skills", "secondary")
     role_terms = profile_terms(profile, "search", "target_roles")
@@ -57,6 +60,8 @@ def score_offer(offer: Offer, profile: dict) -> ScoreResult:
         strengths.append("primary skills: " + ", ".join(primary_hits[:6]))
     else:
         gaps.append("no primary skill match")
+    if primary_hits and not _domain_primary_hits(primary_hits):
+        gaps.append("no domain primary skill match")
     if secondary_hits:
         strengths.append("secondary skills: " + ", ".join(secondary_hits[:5]))
     if role_hits:
@@ -74,7 +79,8 @@ def score_offer(offer: Offer, profile: dict) -> ScoreResult:
     else:
         reasons.append("salary not used as a primary criterion")
 
-    eligible = location_ok and seniority_ok and contract_ok
+    skill_ok = bool(_domain_primary_hits(primary_hits))
+    eligible = location_ok and seniority_ok and contract_ok and skill_ok
     if not eligible:
         score = min(score, 49)
 
@@ -104,16 +110,14 @@ def _offer_text(offer: Offer) -> str:
     ).lower()
 
 
-def _location_status(text: str) -> tuple[str, bool]:
-    if _contains_any(text, ["full remote", "fully remote", "remote first", "remote-first", "100% remote"]):
+def _location_status(offer: Offer) -> tuple[str, bool]:
+    location_text = " ".join([offer.location, offer.remote]).lower()
+    remote_text = " ".join([offer.remote, offer.description]).lower()
+    if _contains_any(remote_text, ["full remote", "fully remote", "remote first", "remote-first", "100% remote"]):
         return "full remote", True
-    if re.search(r"\bparis\b", text):
-        return "paris intramuros assumed", True
-    if _contains_any(text, ["3 days remote", "3 remote days", "3 jours de teletravail", "3 jours de tt", "mostly remote"]):
-        return "substantial hybrid remote", True
-    if re.search(r"\b[345]\s*(days|jours).{0,20}(remote|teletravail|tt)\b", text):
-        return "substantial hybrid remote", True
-    if _contains_any(text, ["remote", "hybrid", "teletravail"]):
+    if re.search(r"\bparis\b", location_text):
+        return "paris intramuros", True
+    if _contains_any(location_text, ["remote", "hybrid", "teletravail"]):
         return "remote unclear", False
     return "not paris or full remote", False
 
@@ -126,16 +130,34 @@ def _contract_status(text: str) -> tuple[str, bool]:
     return "unknown", False
 
 
-def _seniority_score(text: str) -> tuple[str, int, bool]:
+def _seniority_score(offer: Offer) -> tuple[str, int, bool]:
+    text = _offer_text(offer)
+    title_text = offer.title.lower()
     if _contains_any(text, ["internship", "intern ", "stage", "apprenticeship", "alternance", "work-study"]):
         return "internship/apprenticeship", 0, False
     if _contains_any(text, ["junior", "entry level", "entry-level", "graduate"]):
         return "junior", 0, False
-    if _contains_any(text, ["head of", "lead", "principal", "staff", "senior", "manager"]):
+    if _max_required_years(text) > 6:
+        return "too_senior_gt_6_years", 0, False
+    if _contains_any(title_text, ["head of", "lead", "principal", "staff", "director", "manager"]):
+        return "too_senior_leadership", 0, False
+    if _contains_any(text, ["senior"]):
         return "senior_plus", 15, True
     if _contains_any(text, ["confirmed", "confirme", "experienced", "mid-level", "mid level"]):
         return "confirmed", 12, True
     return "unspecified", 6, True
+
+
+def _max_required_years(text: str) -> int:
+    years = []
+    patterns = [
+        r"(\d{1,2})\s*\+?\s*(?:years?|ans)\s+(?:of\s+)?experience",
+        r"(?:experience|exp[. ]*)\s*(?:of\s*)?(\d{1,2})\s*\+?\s*(?:years?|ans)",
+        r"(?:minimum|min\.?|at least|au moins)\s*(\d{1,2})\s*\+?\s*(?:years?|ans)",
+    ]
+    for pattern in patterns:
+        years.extend(int(match) for match in re.findall(pattern, text))
+    return max(years, default=0)
 
 
 def _hard_exclusion(text: str) -> str | None:
@@ -155,6 +177,14 @@ def _matched_terms(text: str, terms: Iterable[str]) -> list[str]:
         if normalized and normalized in text:
             hits.append(str(term))
     return hits
+
+
+def _domain_primary_hits(primary_hits: Iterable[str]) -> list[str]:
+    return [
+        hit
+        for hit in primary_hits
+        if hit.strip().lower() not in SUPPORT_ONLY_PRIMARY_SKILLS
+    ]
 
 
 def _contains_any(text: str, terms: Iterable[str]) -> bool:

@@ -34,13 +34,14 @@ class WttjPublicConnector:
     def discover(
         self,
         queries: Iterable[str],
-        max_pages: int = 5,
-        target_count: int = 100,
+        max_pages: int = 15,
+        target_count: int = 300,
         hits_per_page: int = 20,
     ) -> list[Offer]:
         offers: dict[str, Offer] = {}
-        for query in queries:
-            for page in range(1, max_pages + 1):
+        query_list = list(queries)
+        for page in range(1, max_pages + 1):
+            for query in query_list:
                 for offer in self.search(query, page=page - 1, hits_per_page=hits_per_page):
                     offers[offer.source_id] = offer
                 if len(offers) >= target_count:

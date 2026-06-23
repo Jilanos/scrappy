@@ -11,10 +11,10 @@ The MVP goal is to collect configured job offers, store every encountered offer 
 - CV-derived profile seed in `examples/profile.yaml`.
 - WTTJ public Algolia connector.
 - Explainable deterministic scoring:
-  - mandatory location gate: Paris, full remote, or substantial hybrid remote;
+  - mandatory location gate: Paris from the normalized location field, or explicit full remote;
   - mandatory contract gate: CDI/full-time;
-  - skill match;
-  - seniority match;
+  - mandatory domain primary skill match; Python alone is treated as a support skill;
+  - seniority match with roles above 6 years of required experience excluded;
   - internship/apprenticeship exclusion;
   - ESN/consulting downrank;
   - direct military exclusion with adjacent detection/sensing/imaging/security allowed.
@@ -36,10 +36,12 @@ Run collection and scoring:
 python3 -m scrappy run \
   --db data/scrappy.sqlite \
   --profile examples/profile.yaml \
-  --target-offers 100 \
-  --max-pages 5 \
+  --target-offers 300 \
+  --max-pages 15 \
   --xlsx reports/top_offers.xlsx
 ```
+
+The console top only shows eligible offers. The XLSX still keeps every scored offer in `all_scored`, with non-eligible offers also routed to `rejected` for calibration.
 
 Default WTTJ queries are:
 
@@ -81,7 +83,7 @@ Current finding:
   - public search-only API key from the website bundle
   - required browser-like headers: `Origin`, `Referer`, `X-Algolia-Application-Id`, `X-Algolia-API-Key`
 - Third-party APIs remain an accepted fallback because no privileged provider credentials are available.
-- Current CLI target is around 100 offers per run, with de-duplication in SQLite by source id and canonical URL.
+- Current CLI target is around 300 offers per run, with de-duplication in SQLite by source id and canonical URL.
 
 Initial Logics documents:
 

@@ -4,6 +4,7 @@ import argparse
 from pathlib import Path
 
 from scrappy.connectors import WttjPublicConnector
+from scrappy.models import RankedOffer
 from scrappy.profile import load_profile, profile_terms
 from scrappy.reporting import print_console, read_review_rows, write_xlsx
 from scrappy.scoring import score_offer
@@ -43,8 +44,8 @@ def main(argv: list[str] | None = None) -> None:
     run_parser.add_argument("--profile", default=DEFAULT_PROFILE)
     run_parser.add_argument("--provider", default="wttj-public", choices=["wttj-public"])
     run_parser.add_argument("--query", action="append", help="Override profile search query. Repeatable.")
-    run_parser.add_argument("--max-pages", type=int, default=5)
-    run_parser.add_argument("--target-offers", type=int, default=100)
+    run_parser.add_argument("--max-pages", type=int, default=15)
+    run_parser.add_argument("--target-offers", type=int, default=300)
     run_parser.add_argument("--hits-per-page", type=int, default=20)
     run_parser.add_argument("--top", type=int, default=5)
     run_parser.add_argument("--xlsx", default=DEFAULT_REPORT)
@@ -103,7 +104,7 @@ def _run(args: argparse.Namespace) -> None:
     print(f"Provider: {connector.name}")
     print(f"Discovered: {len(offers)}")
     print(f"New or changed: {changed_count}")
-    print_console(ranked[: args.top])
+    _print_top_eligible(ranked, args.top)
     write_xlsx(args.xlsx, ranked)
     print(f"XLSX report: {args.xlsx}")
 
@@ -120,7 +121,7 @@ def _rescore(args: argparse.Namespace) -> None:
         finish_run(conn, run_id, discovered=count, changed=count)
         ranked = latest_ranked(conn, limit=None)
     print(f"Rescored offers: {count}")
-    print_console(ranked[: args.top])
+    _print_top_eligible(ranked, args.top)
     write_xlsx(args.xlsx, ranked)
     print(f"XLSX report: {args.xlsx}")
 
@@ -161,6 +162,12 @@ def _import_reviews(args: argparse.Namespace) -> None:
 
 def _profile_version(profile: dict) -> str:
     return str(profile.get("version") or "unversioned")
+
+
+def _print_top_eligible(ranked: list[RankedOffer], top: int) -> None:
+    eligible = [item for item in ranked if item.score.eligible]
+    print(f"Eligible offers: {len(eligible)}")
+    print_console(eligible[:top])
 
 
 def _default_queries(profile: dict) -> list[str]:
