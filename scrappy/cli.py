@@ -4,6 +4,7 @@ import argparse
 from pathlib import Path
 
 from scrappy.connectors import WttjPublicConnector
+from scrappy.connectors.wttj import DiscoveryResult
 from scrappy.models import RankedOffer
 from scrappy.profile import load_profile, profile_terms
 from scrappy.reporting import print_console, read_review_rows, write_xlsx
@@ -86,12 +87,13 @@ def _run(args: argparse.Namespace) -> None:
     with connect(args.db) as conn:
         init_db(conn)
         run_id = create_run(conn, connector.name, len(queries))
-        offers = connector.discover(
+        discovery = connector.discover_with_stats(
             queries,
             max_pages=args.max_pages,
             target_count=args.target_offers,
             hits_per_page=args.hits_per_page,
         )
+        offers = discovery.offers
         changed_count = 0
         for offer in offers:
             offer_id, changed = upsert_offer(conn, run_id, offer)
@@ -103,6 +105,7 @@ def _run(args: argparse.Namespace) -> None:
 
     print(f"Provider: {connector.name}")
     print(f"Discovered: {len(offers)}")
+    _print_discovery_diagnostics(discovery, args.target_offers, args.max_pages, args.hits_per_page)
     print(f"New or changed: {changed_count}")
     _print_top_eligible(ranked, args.top)
     write_xlsx(args.xlsx, ranked)
@@ -173,6 +176,41 @@ def _print_top_eligible(ranked: list[RankedOffer], top: int) -> None:
 def _default_queries(profile: dict) -> list[str]:
     queries = profile_terms(profile, "search", "default_queries")
     return queries or DEFAULT_QUERIES
+
+
+def _print_discovery_diagnostics(
+    discovery: DiscoveryResult,
+    target_offers: int,
+    max_pages: int,
+    hits_per_page: int,
+) -> None:
+    print(f"Raw provider hits: {discovery.raw_hits}")
+    if discovery.duplicate_hits:
+        print(f"Duplicate hits removed: {discovery.duplicate_hits}")
+    if discovery.target_reached:
+        return
+
+    print(
+        "Target not reached: "
+        f"requested {target_offers}, discovered {len(discovery.offers)} unique offers "
+        f"with max_pages={max_pages} and hits_per_page={hits_per_page}."
+    )
+    for line in _query_capacity_lines(discovery):
+        print(line)
+
+
+def _query_capacity_lines(discovery: DiscoveryResult) -> list[str]:
+    by_query: dict[str, dict[str, int]] = {}
+    for page in discovery.pages:
+        stats = by_query.setdefault(page.query, {"raw": 0, "nb_hits": page.nb_hits, "nb_pages": page.nb_pages})
+        stats["raw"] += page.hits
+        stats["nb_hits"] = max(stats["nb_hits"], page.nb_hits)
+        stats["nb_pages"] = max(stats["nb_pages"], page.nb_pages)
+
+    return [
+        f"Query capacity: {query!r} returned {stats['raw']} hits in this run; provider reports {stats['nb_hits']} total hits across {stats['nb_pages']} pages."
+        for query, stats in by_query.items()
+    ]
 
 
 if __name__ == "__main__":

@@ -42,8 +42,10 @@ def test_maps_algolia_hit_to_offer() -> None:
 
 def test_discover_paginates_until_target_count() -> None:
     class FixtureConnector(WttjPublicConnector):
-        def search(self, query: str, page: int = 0, hits_per_page: int = 20, retries: int = 2) -> list[Offer]:
-            return [
+        def search_page(self, query: str, page: int = 0, hits_per_page: int = 20, retries: int = 2):
+            from scrappy.connectors.wttj import SearchPage
+
+            offers = [
                 Offer(
                     source=self.name,
                     source_id=f"{query}-{page}-{index}",
@@ -52,6 +54,7 @@ def test_discover_paginates_until_target_count() -> None:
                 )
                 for index in range(2)
             ]
+            return SearchPage(offers=offers, query=query, page=page, hits=len(offers), nb_hits=6, nb_pages=3)
 
     offers = FixtureConnector().discover(["electronics", "signal"], max_pages=3, target_count=5)
 
@@ -59,3 +62,31 @@ def test_discover_paginates_until_target_count() -> None:
     assert offers[0].source_id == "electronics-0-0"
     assert offers[2].source_id == "signal-0-0"
     assert offers[-1].source_id == "electronics-1-1"
+
+
+def test_discover_with_stats_reports_raw_hits_duplicates_and_capacity() -> None:
+    class FixtureConnector(WttjPublicConnector):
+        def search_page(self, query: str, page: int = 0, hits_per_page: int = 20, retries: int = 2):
+            from scrappy.connectors.wttj import SearchPage
+
+            if page > 0:
+                offers = []
+            else:
+                offers = [
+                    Offer(
+                        source=self.name,
+                        source_id=f"shared-{index}",
+                        url=f"https://example.test/{query}/{index}",
+                        title="Engineer",
+                    )
+                    for index in range(2)
+                ]
+            return SearchPage(offers=offers, query=query, page=page, hits=len(offers), nb_hits=2, nb_pages=1)
+
+    result = FixtureConnector().discover_with_stats(["electronics", "signal"], max_pages=2, target_count=10)
+
+    assert len(result.offers) == 2
+    assert result.raw_hits == 4
+    assert result.duplicate_hits == 2
+    assert not result.target_reached
+    assert result.pages[0].nb_hits == 2

@@ -22,6 +22,25 @@ ALGOLIA_JOBS_INDEX = "wk_cms_jobs_production"
 
 
 @dataclass(frozen=True)
+class SearchPage:
+    offers: list[Offer]
+    query: str
+    page: int
+    hits: int
+    nb_hits: int
+    nb_pages: int
+
+
+@dataclass(frozen=True)
+class DiscoveryResult:
+    offers: list[Offer]
+    pages: list[SearchPage]
+    raw_hits: int
+    duplicate_hits: int
+    target_reached: bool
+
+
+@dataclass(frozen=True)
 class WttjPublicConnector:
     locale: str = "en"
     timeout_seconds: int = 20
@@ -38,15 +57,46 @@ class WttjPublicConnector:
         target_count: int = 300,
         hits_per_page: int = 20,
     ) -> list[Offer]:
+        return self.discover_with_stats(
+            queries,
+            max_pages=max_pages,
+            target_count=target_count,
+            hits_per_page=hits_per_page,
+        ).offers
+
+    def discover_with_stats(
+        self,
+        queries: Iterable[str],
+        max_pages: int = 15,
+        target_count: int = 300,
+        hits_per_page: int = 20,
+    ) -> DiscoveryResult:
         offers: dict[str, Offer] = {}
+        pages: list[SearchPage] = []
+        raw_hits = 0
         query_list = list(queries)
         for page in range(1, max_pages + 1):
             for query in query_list:
-                for offer in self.search(query, page=page - 1, hits_per_page=hits_per_page):
+                search_page = self.search_page(query, page=page - 1, hits_per_page=hits_per_page)
+                pages.append(search_page)
+                raw_hits += search_page.hits
+                for offer in search_page.offers:
                     offers[offer.source_id] = offer
                 if len(offers) >= target_count:
-                    return list(offers.values())
-        return list(offers.values())
+                    return DiscoveryResult(
+                        offers=list(offers.values()),
+                        pages=pages,
+                        raw_hits=raw_hits,
+                        duplicate_hits=raw_hits - len(offers),
+                        target_reached=True,
+                    )
+        return DiscoveryResult(
+            offers=list(offers.values()),
+            pages=pages,
+            raw_hits=raw_hits,
+            duplicate_hits=raw_hits - len(offers),
+            target_reached=len(offers) >= target_count,
+        )
 
     def search(
         self,
@@ -55,6 +105,15 @@ class WttjPublicConnector:
         hits_per_page: int = 20,
         retries: int = 2,
     ) -> list[Offer]:
+        return self.search_page(query, page=page, hits_per_page=hits_per_page, retries=retries).offers
+
+    def search_page(
+        self,
+        query: str,
+        page: int = 0,
+        hits_per_page: int = 20,
+        retries: int = 2,
+    ) -> SearchPage:
         params = urlencode({"query": query, "hitsPerPage": hits_per_page, "page": page})
         payload = json.dumps(
             {"requests": [{"indexName": ALGOLIA_JOBS_INDEX, "params": params}]}
@@ -72,8 +131,16 @@ class WttjPublicConnector:
             },
         )
         data = self._post_json(request, retries=retries)
-        hits = data.get("results", [{}])[0].get("hits", [])
-        return [self.offer_from_hit(hit) for hit in hits]
+        result = data.get("results", [{}])[0]
+        hits = result.get("hits", [])
+        return SearchPage(
+            offers=[self.offer_from_hit(hit) for hit in hits],
+            query=query,
+            page=page,
+            hits=len(hits),
+            nb_hits=int(result.get("nbHits") or 0),
+            nb_pages=int(result.get("nbPages") or 0),
+        )
 
     def search_url(self, query: str, page: int = 1) -> str:
         return (
