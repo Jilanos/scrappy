@@ -33,6 +33,11 @@ languages:
     - German
     - Spanish
 search:
+  default_queries:
+    - electronics engineer
+    - signal processing engineer
+    - R&D engineer
+    - medical imaging engineer
   target_roles:
     - R&D engineer
     - deep tech engineer

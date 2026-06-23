@@ -1,4 +1,5 @@
 from scrappy.connectors.wttj import WttjPublicConnector
+from scrappy.models import Offer
 
 
 def test_parses_wttj_job_links_from_html() -> None:
@@ -37,3 +38,22 @@ def test_maps_algolia_hit_to_offer() -> None:
     assert offer.location == "Paris, France"
     assert offer.seniority == "senior"
     assert offer.contract_type == "Full-Time"
+
+
+def test_discover_paginates_until_target_count() -> None:
+    class FixtureConnector(WttjPublicConnector):
+        def search(self, query: str, page: int = 0, hits_per_page: int = 20, retries: int = 2) -> list[Offer]:
+            return [
+                Offer(
+                    source=self.name,
+                    source_id=f"{query}-{page}-{index}",
+                    url=f"https://example.test/{query}/{page}/{index}",
+                    title="Engineer",
+                )
+                for index in range(2)
+            ]
+
+    offers = FixtureConnector().discover(["electronics", "signal"], max_pages=3, target_count=5)
+
+    assert len(offers) == 6
+    assert offers[-1].source_id == "electronics-2-1"

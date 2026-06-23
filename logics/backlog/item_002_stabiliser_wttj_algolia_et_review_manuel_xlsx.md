@@ -1,10 +1,10 @@
 ## item_002_stabiliser_wttj_algolia_et_review_manuel_xlsx - Stabiliser WTTJ Algolia et review manuel XLSX
 > From version: 1.0.0
 > Schema version: 1.0
-> Status: Ready
+> Status: Done
 > Understanding: 98
-> Confidence: 92
-> Progress: 0
+> Confidence: 93
+> Progress: 100%
 > Complexity: High
 > Theme: Operator workflow and runtime integration
 > Reminder: Update status/understanding/confidence/progress and linked request/task references when you edit this doc.
@@ -43,13 +43,13 @@ Le connecteur WTTJ Algolia est fonctionnel mais encore minimal. Il faut le rendr
 - AC8: Le workflow reste CLI only.
 
 # AC Traceability
-- request-AC1 -> AC1, AC2. Proof: pagination, target volume and retry are in scope.
-- request-AC2 -> AC3, AC4. Proof: source/default filters are explicit and testable.
-- request-AC3 -> AC5, AC6. Proof: ineligible offers stay visible in `all_scored`.
-- request-AC4 -> AC6. Proof: XLSX sheet structure is explicit.
-- request-AC5 -> AC7. Proof: manual decisions are imported into SQLite.
-- request-AC6 -> AC3. Proof: query set is specified.
-- request-AC7 -> AC8. Proof: CLI-only workflow is explicit.
+- request-AC1 -> AC1, AC2. Proof: task `task_002_stabiliser_wttj_algolia_et_review_manuel_xlsx` is Done; `scrappy/connectors/wttj.py` implements `target_count`, `max_pages`, `hits_per_page`; smoke run collected WTTJ offers and wrote XLSX.
+- request-AC2 -> AC3, AC4. Proof: task `task_002_stabiliser_wttj_algolia_et_review_manuel_xlsx` is Done; `scrappy/scoring.py` applies CDI/full-time, location and internship/apprenticeship gates; `tests/test_scoring.py` passes.
+- request-AC3 -> AC5, AC6. Proof: task `task_002_stabiliser_wttj_algolia_et_review_manuel_xlsx` is Done; `scrappy/reporting.py` writes all scored offers and rejected offers; `tests/test_reporting.py` passes.
+- request-AC4 -> AC6. Proof: task `task_002_stabiliser_wttj_algolia_et_review_manuel_xlsx` is Done; XLSX includes `all_scored`, `rejected`, stable source ids and review columns.
+- request-AC5 -> AC7. Proof: task `task_002_stabiliser_wttj_algolia_et_review_manuel_xlsx` is Done; `scrappy import-reviews` persists manual decisions; `tests/test_cli.py` passes.
+- request-AC6 -> AC3. Proof: task `task_002_stabiliser_wttj_algolia_et_review_manuel_xlsx` is Done; `examples/profile.yaml` and `scrappy/cli.py` define default queries without `FPGA engineer`.
+- request-AC7 -> AC8. Proof: task `task_002_stabiliser_wttj_algolia_et_review_manuel_xlsx` is Done; no web UI files or runtime were added.
 
 # Decision framing
 - Product framing: Needed, because this changes the review workflow from passive output to human-in-the-loop labeling.
@@ -79,6 +79,7 @@ Le connecteur WTTJ Algolia est fonctionnel mais encore minimal. Il faut le rendr
 - Hybrid rationale: Derived from request `req_001_stabilize_wttj_review` and kept bounded to one coherent delivery slice.
 - Source file: `logics/request/req_001_stabilize_wttj_review.md`.
 - Generated locally by logics-manager, then refined with user decisions from the WTTJ stabilization planning.
+- Task `task_002_stabiliser_wttj_algolia_et_review_manuel_xlsx` was finished via `logics-manager flow finish task` on 2026-06-23.
 
 # Tasks
 - `task_002_stabiliser_wttj_algolia_et_review_manuel_xlsx`

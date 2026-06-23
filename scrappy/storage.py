@@ -10,7 +10,8 @@ from typing import Iterable
 from scrappy.models import Offer, RankedOffer, ScoreResult
 
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
+VALID_DECISIONS = {"selected", "rejected", "maybe"}
 
 
 def connect(db_path: str | Path) -> sqlite3.Connection:
@@ -87,6 +88,19 @@ def init_db(conn: sqlite3.Connection) -> None:
             reasons_json TEXT NOT NULL,
             FOREIGN KEY(run_id) REFERENCES runs(id),
             FOREIGN KEY(offer_id) REFERENCES offers(id)
+        );
+
+        CREATE TABLE IF NOT EXISTS manual_reviews (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            offer_id INTEGER NOT NULL,
+            source TEXT NOT NULL,
+            source_id TEXT NOT NULL,
+            decision TEXT NOT NULL CHECK(decision IN ('selected', 'rejected', 'maybe')),
+            review_note TEXT NOT NULL DEFAULT '',
+            reviewed_at TEXT NOT NULL,
+            imported_at TEXT NOT NULL,
+            FOREIGN KEY(offer_id) REFERENCES offers(id),
+            UNIQUE(source, source_id)
         );
         """
     )
@@ -220,20 +234,76 @@ def save_analysis(
     conn.commit()
 
 
-def latest_ranked(conn: sqlite3.Connection, limit: int = 5) -> list[RankedOffer]:
+def latest_ranked(conn: sqlite3.Connection, limit: int | None = 5) -> list[RankedOffer]:
+    limit_sql = ""
+    params: tuple[int, ...] = ()
+    if limit is not None:
+        limit_sql = "LIMIT ?"
+        params = (limit,)
     rows = conn.execute(
-        """
-        SELECT o.*, a.score, a.eligible, a.location_status, a.seniority_status,
+        f"""
+        SELECT o.*, o.id AS offer_id, a.score, a.eligible, a.location_status, a.seniority_status,
                a.strengths_json, a.gaps_json, a.risks_json, a.reasons_json
         FROM analyses a
         JOIN offers o ON o.id = a.offer_id
         WHERE a.id IN (SELECT MAX(id) FROM analyses GROUP BY offer_id)
         ORDER BY a.eligible DESC, a.score DESC, a.analyzed_at DESC
-        LIMIT ?
+        {limit_sql}
         """,
-        (limit,),
+        params,
     ).fetchall()
     return [_ranked_from_row(row) for row in rows]
+
+
+def save_manual_review(
+    conn: sqlite3.Connection,
+    source: str,
+    source_id: str,
+    decision: str,
+    review_note: str = "",
+    reviewed_at: str | None = None,
+) -> bool:
+    normalized_decision = decision.strip().lower()
+    if normalized_decision not in VALID_DECISIONS:
+        raise ValueError(f"Invalid decision: {decision}")
+
+    row = conn.execute(
+        "SELECT id FROM offers WHERE source = ? AND source_id = ?",
+        (source, source_id),
+    ).fetchone()
+    if row is None:
+        return False
+
+    now = now_iso()
+    conn.execute(
+        """
+        INSERT INTO manual_reviews(
+            offer_id, source, source_id, decision, review_note, reviewed_at, imported_at
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT(source, source_id) DO UPDATE SET
+            offer_id = excluded.offer_id,
+            decision = excluded.decision,
+            review_note = excluded.review_note,
+            reviewed_at = excluded.reviewed_at,
+            imported_at = excluded.imported_at
+        """,
+        (
+            int(row["id"]),
+            source,
+            source_id,
+            normalized_decision,
+            review_note.strip(),
+            reviewed_at.strip() if reviewed_at else now,
+            now,
+        ),
+    )
+    conn.commit()
+    return True
+
+
+def iter_manual_reviews(conn: sqlite3.Connection) -> Iterable[sqlite3.Row]:
+    yield from conn.execute("SELECT * FROM manual_reviews ORDER BY imported_at DESC, id DESC")
 
 
 def iter_offers(conn: sqlite3.Connection) -> Iterable[tuple[int, Offer]]:
@@ -284,6 +354,7 @@ def _offer_from_row(row: sqlite3.Row) -> Offer:
 def _ranked_from_row(row: sqlite3.Row) -> RankedOffer:
     return RankedOffer(
         offer=_offer_from_row(row),
+        offer_id=int(row["offer_id"]) if "offer_id" in row.keys() else None,
         score=ScoreResult(
             score=int(row["score"]),
             eligible=bool(row["eligible"]),

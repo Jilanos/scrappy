@@ -1,9 +1,9 @@
 ## req_001_stabilize_wttj_review - Stabiliser WTTJ Algolia et review manuel XLSX
 > From version: 1.0.0
 > Schema version: 1.0
-> Status: Draft
+> Status: Done
 > Understanding: 98
-> Confidence: 92
+> Confidence: 93
 > Complexity: Medium
 > Theme: Operator workflow
 > Reminder: Update status/understanding/confidence and linked backlog/task references when you edit this doc.
@@ -46,6 +46,15 @@
 - WTTJ connector: `scrappy/connectors/wttj.py`
 - CLI: `scrappy/cli.py`
 - Initial profile: `examples/profile.yaml`
+
+# Acceptance Traceability
+- AC1 proof: `task_002_stabiliser_wttj_algolia_et_review_manuel_xlsx` Done; `scrappy/connectors/wttj.py` paginates with `max_pages`, `target_count`, `hits_per_page`; smoke collected 20 WTTJ offers with `--target-offers 20 --max-pages 1`.
+- AC2 proof: `task_002_stabiliser_wttj_algolia_et_review_manuel_xlsx` Done; `scrappy/scoring.py` applies CDI/full-time, location and internship/apprenticeship gates; covered by `tests/test_scoring.py`.
+- AC3 proof: `task_002_stabiliser_wttj_algolia_et_review_manuel_xlsx` Done; `scrappy/reporting.py` writes all ranked offers to `all_scored` and non-eligible offers to `rejected`; covered by `tests/test_reporting.py`.
+- AC4 proof: `task_002_stabiliser_wttj_algolia_et_review_manuel_xlsx` Done; `scrappy/reporting.py` writes `all_scored` and `rejected` sheets with source identifiers and review fields; covered by `tests/test_reporting.py`.
+- AC5 proof: `task_002_stabiliser_wttj_algolia_et_review_manuel_xlsx` Done; `scrappy import-reviews` persists `selected`, `maybe`, `rejected` into SQLite; covered by `tests/test_cli.py` and smoke import on `/tmp/scrappy-review.sqlite`.
+- AC6 proof: `task_002_stabiliser_wttj_algolia_et_review_manuel_xlsx` Done; `examples/profile.yaml` and `scrappy/cli.py` define default queries without `FPGA engineer`.
+- AC7 proof: `task_002_stabiliser_wttj_algolia_et_review_manuel_xlsx` Done; implementation only changes the CLI and introduces no web UI.
 
 # AI Context
 - Summary: Stabilize WTTJ Algolia collection and add manual XLSX review decisions in the CLI workflow.

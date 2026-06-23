@@ -10,6 +10,7 @@ from scrappy.profile import profile_terms
 def score_offer(offer: Offer, profile: dict) -> ScoreResult:
     text = _offer_text(offer)
     location_status, location_ok = _location_status(text)
+    contract_status, contract_ok = _contract_status(text)
     exclusion = _hard_exclusion(text)
     if exclusion:
         return ScoreResult(
@@ -42,6 +43,10 @@ def score_offer(offer: Offer, profile: dict) -> ScoreResult:
         strengths.append(f"location: {location_status}")
     else:
         gaps.append(f"location not eligible: {offer.location or offer.remote or 'unknown'}")
+    if contract_ok:
+        strengths.append(f"contract: {contract_status}")
+    else:
+        gaps.append(f"contract not eligible: {offer.contract_type or 'unknown'}")
 
     score += min(30, len(primary_hits) * 6)
     score += min(15, len(secondary_hits) * 3)
@@ -69,7 +74,7 @@ def score_offer(offer: Offer, profile: dict) -> ScoreResult:
     else:
         reasons.append("salary not used as a primary criterion")
 
-    eligible = location_ok and seniority_ok
+    eligible = location_ok and seniority_ok and contract_ok
     if not eligible:
         score = min(score, 49)
 
@@ -111,6 +116,14 @@ def _location_status(text: str) -> tuple[str, bool]:
     if _contains_any(text, ["remote", "hybrid", "teletravail"]):
         return "remote unclear", False
     return "not paris or full remote", False
+
+
+def _contract_status(text: str) -> tuple[str, bool]:
+    if _contains_any(text, ["cdi", "full-time", "full time", "permanent", "temps plein"]):
+        return "cdi/full-time", True
+    if _contains_any(text, ["internship", "apprenticeship", "alternance", "stage", "freelance", "part-time", "part time", "temporary"]):
+        return "non-target contract", False
+    return "unknown", False
 
 
 def _seniority_score(text: str) -> tuple[str, int, bool]:

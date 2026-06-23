@@ -13,6 +13,7 @@ def test_scores_relevant_paris_confirmed_offer() -> None:
         company="Deeptech",
         location="Paris",
         seniority="Senior",
+        contract_type="Full-Time",
         description="Python FPGA ultrasound medical imaging prototype validation",
     )
 
@@ -53,6 +54,7 @@ def test_rejects_unclear_remote_outside_paris() -> None:
         location="Lyon",
         remote="hybrid",
         seniority="confirmed",
+        contract_type="Full-Time",
         description="Python FPGA electronics",
     )
 
@@ -60,3 +62,22 @@ def test_rejects_unclear_remote_outside_paris() -> None:
 
     assert not result.eligible
     assert result.location_status == "remote unclear"
+
+
+def test_rejects_missing_cdi_or_full_time_contract() -> None:
+    profile = load_profile("examples/profile.yaml")
+    offer = Offer(
+        source="fixture",
+        source_id="4",
+        url="https://example.test/job",
+        title="Confirmed Electronics Engineer",
+        company="Deeptech",
+        location="Paris",
+        seniority="confirmed",
+        description="Python electronics signal processing",
+    )
+
+    result = score_offer(offer, profile)
+
+    assert not result.eligible
+    assert "contract not eligible" in " ".join(result.gaps)

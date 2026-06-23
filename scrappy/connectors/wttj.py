@@ -4,8 +4,10 @@ import hashlib
 import html
 import json
 import re
+import time
 from dataclasses import dataclass
 from typing import Iterable
+from urllib.error import HTTPError, URLError
 from urllib.parse import quote_plus, urlencode, urljoin
 from urllib.request import Request, urlopen
 
@@ -29,15 +31,29 @@ class WttjPublicConnector:
     def name(self) -> str:
         return "wttj_algolia"
 
-    def discover(self, queries: Iterable[str], max_pages: int = 1) -> list[Offer]:
+    def discover(
+        self,
+        queries: Iterable[str],
+        max_pages: int = 5,
+        target_count: int = 100,
+        hits_per_page: int = 20,
+    ) -> list[Offer]:
         offers: dict[str, Offer] = {}
         for query in queries:
             for page in range(1, max_pages + 1):
-                for offer in self.search(query, page=page - 1):
+                for offer in self.search(query, page=page - 1, hits_per_page=hits_per_page):
                     offers[offer.source_id] = offer
+                if len(offers) >= target_count:
+                    return list(offers.values())
         return list(offers.values())
 
-    def search(self, query: str, page: int = 0, hits_per_page: int = 20) -> list[Offer]:
+    def search(
+        self,
+        query: str,
+        page: int = 0,
+        hits_per_page: int = 20,
+        retries: int = 2,
+    ) -> list[Offer]:
         params = urlencode({"query": query, "hitsPerPage": hits_per_page, "page": page})
         payload = json.dumps(
             {"requests": [{"indexName": ALGOLIA_JOBS_INDEX, "params": params}]}
@@ -54,8 +70,7 @@ class WttjPublicConnector:
                 "X-Algolia-Application-Id": ALGOLIA_APP_ID,
             },
         )
-        with urlopen(request, timeout=self.timeout_seconds) as response:
-            data = json.loads(response.read().decode("utf-8"))
+        data = self._post_json(request, retries=retries)
         hits = data.get("results", [{}])[0].get("hits", [])
         return [self.offer_from_hit(hit) for hit in hits]
 
@@ -136,6 +151,19 @@ class WttjPublicConnector:
         with urlopen(request, timeout=self.timeout_seconds) as response:
             charset = response.headers.get_content_charset() or "utf-8"
             return response.read().decode(charset, errors="replace")
+
+    def _post_json(self, request: Request, retries: int) -> dict:
+        last_error: HTTPError | URLError | TimeoutError | None = None
+        for attempt in range(retries + 1):
+            try:
+                with urlopen(request, timeout=self.timeout_seconds) as response:
+                    return json.loads(response.read().decode("utf-8"))
+            except (HTTPError, URLError, TimeoutError) as error:
+                last_error = error
+                if attempt >= retries:
+                    break
+                time.sleep(0.5 * (attempt + 1))
+        raise RuntimeError(f"WTTJ Algolia request failed after {retries + 1} attempts") from last_error
 
 
 def _job_links(body: str) -> Iterable[str]:

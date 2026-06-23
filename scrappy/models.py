@@ -34,3 +34,4 @@ class ScoreResult:
 class RankedOffer:
     offer: Offer
     score: ScoreResult
+    offer_id: int | None = None
