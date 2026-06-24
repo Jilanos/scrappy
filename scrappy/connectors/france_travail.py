@@ -80,7 +80,7 @@ class FranceTravailConnector:
         page_size = min(max(1, hits_per_page), 150)
         for page in range(max_pages):
             for query in queries:
-                search_page = self.search_page(query=query, page=page, hits_per_page=page_size)
+                search_page = self.search_page(query=_france_travail_query(query), page=page, hits_per_page=page_size)
                 pages.append(search_page)
                 raw_hits += search_page.hits
                 for offer in search_page.offers:
@@ -172,8 +172,13 @@ class FranceTravailConnector:
         )
         try:
             with urlopen(request, timeout=self.timeout_seconds) as response:
-                return json.loads(response.read().decode("utf-8")), response.headers.get("Content-Range", "")
+                body = response.read().decode("utf-8")
+                if response.status == 204 or not body.strip():
+                    return {"resultats": [], "total": 0}, response.headers.get("Content-Range", "")
+                return json.loads(body), response.headers.get("Content-Range", "")
         except HTTPError as error:
+            if error.code == 204:
+                return {"resultats": [], "total": 0}, ""
             raise RuntimeError(f"France Travail search failed for query={query!r}: HTTP {error.code}") from error
         except (URLError, TimeoutError, json.JSONDecodeError) as error:
             raise RuntimeError(f"France Travail search failed for query={query!r}") from error
@@ -287,3 +292,13 @@ def _nb_pages(total: int, hits_per_page: int) -> int:
     if hits_per_page <= 0:
         return 0
     return (total + hits_per_page - 1) // hits_per_page
+
+
+def _france_travail_query(query: str) -> str:
+    translations = {
+        "electronics engineer": "electronique",
+        "signal processing engineer": "traitement signal",
+        "r&d engineer": "ingenieur recherche developpement",
+        "medical imaging engineer": "imagerie medicale",
+    }
+    return translations.get(query.strip().lower(), query)

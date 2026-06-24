@@ -1,7 +1,7 @@
 ## req_005_integrate_france_travail_jobs_api - Integrer l API Offres d emploi France Travail
 > From version: 1.0.0
 > Schema version: 1.0
-> Status: Draft
+> Status: Done
 > Understanding: 95
 > Confidence: 90
 > Complexity: Medium

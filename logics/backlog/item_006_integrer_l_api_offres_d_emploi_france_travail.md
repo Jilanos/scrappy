@@ -1,10 +1,10 @@
 ## item_006_integrer_l_api_offres_d_emploi_france_travail - Integrer l API Offres d emploi France Travail
 > From version: 1.0.0
 > Schema version: 1.0
-> Status: Ready
+> Status: Done
 > Understanding: 95
 > Confidence: 90
-> Progress: 0%
+> Progress: 100%
 > Complexity: Medium
 > Theme: Provider expansion
 > Reminder: Update status/understanding/confidence/progress and linked request/task references when you edit this doc.
@@ -83,6 +83,7 @@ Valider que cette source apporte des offres pertinentes pour le profil cible, no
 - Hybrid rationale: Derived from request `req_005_integrate_france_travail_jobs_api` and kept bounded to one coherent delivery slice.
 - Source file: `logics/request/req_005_integrate_france_travail_jobs_api.md`.
 - Generated locally by logics-manager.
+- Task `task_006_integrer_l_api_offres_d_emploi_france_travail` was finished via `logics-manager flow finish task` on 2026-06-24.
 
 # Tasks
 - `task_006_integrer_l_api_offres_d_emploi_france_travail`
