@@ -77,3 +77,33 @@ def test_run_continues_with_warning_when_indeed_provider_is_not_configured(tmp_p
     assert "Warning: provider failed" in captured.out
     assert "SCRAPPY_INDEED_API_URL" in captured.out
     assert xlsx.exists()
+
+
+def test_run_continues_with_warning_when_france_travail_is_not_configured(tmp_path, capsys, monkeypatch) -> None:
+    db = tmp_path / "scrappy.sqlite"
+    xlsx = tmp_path / "out.xlsx"
+    monkeypatch.delenv("SCRAPPY_FRANCE_TRAVAIL_CLIENT_ID", raising=False)
+    monkeypatch.delenv("SCRAPPY_FRANCE_TRAVAIL_CLIENT_SECRET", raising=False)
+
+    main(
+        [
+            "run",
+            "--db",
+            str(db),
+            "--provider",
+            "france-travail",
+            "--target-offers",
+            "1",
+            "--max-pages",
+            "1",
+            "--xlsx",
+            str(xlsx),
+        ]
+    )
+
+    captured = capsys.readouterr()
+
+    assert "Provider: france_travail" in captured.out
+    assert "Warning: provider failed" in captured.out
+    assert "SCRAPPY_FRANCE_TRAVAIL_CLIENT_ID" in captured.out
+    assert xlsx.exists()

@@ -3,7 +3,7 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
-from scrappy.connectors import IndeedApiConnector, WttjPublicConnector
+from scrappy.connectors import FranceTravailConnector, IndeedApiConnector, WttjPublicConnector
 from scrappy.connectors.base import DiscoveryResult
 from scrappy.models import RankedOffer
 from scrappy.profile import load_profile, profile_terms
@@ -46,7 +46,7 @@ def main(argv: list[str] | None = None) -> None:
     run_parser.add_argument(
         "--provider",
         action="append",
-        choices=["wttj-public", "indeed-api"],
+        choices=["wttj-public", "indeed-api", "france-travail"],
         help="Provider to collect from. Repeat for multi-platform runs. Defaults to wttj-public.",
     )
     run_parser.add_argument("--query", action="append", help="Override profile search query. Repeatable.")
@@ -212,6 +212,8 @@ def _connector(provider: str):
         return WttjPublicConnector()
     if provider == "indeed-api":
         return IndeedApiConnector.from_env()
+    if provider == "france-travail":
+        return FranceTravailConnector.from_env()
     raise ValueError(f"Unsupported provider: {provider}")
 
 

@@ -89,7 +89,7 @@ python3 -m scrappy rescore \
 
 ## Provider status
 
-The current providers are Welcome to the Jungle and a configurable Indeed API adapter.
+The current providers are Welcome to the Jungle, a configurable Indeed API adapter, and France Travail.
 
 Welcome to the Jungle:
 
@@ -159,6 +159,52 @@ Multi-platform deduplication:
 - High-confidence cross-source duplicates are merged by normalized title, company and location.
 - `offer_aliases` preserves every source identifier for merged offers.
 - The XLSX exposes `merged_sources` and `duplicate_reason`.
+
+France Travail:
+
+- France Travail's official job offers API returns active job offers collected by France Travail or shared by partners that consented to API distribution.
+- It is the preferred free official source for France/Paris coverage.
+- Access requires an application with OAuth client credentials.
+- Default search endpoint: `https://api.francetravail.io/partenaire/offresdemploi/v2/offres/search`
+- Fallback historical endpoint supported through configuration: `https://api.emploi-store.fr/partenaire/offresdemploi/v2/offres/search`
+
+Configure France Travail:
+
+```bash
+export SCRAPPY_FRANCE_TRAVAIL_CLIENT_ID="..."
+export SCRAPPY_FRANCE_TRAVAIL_CLIENT_SECRET="..."
+export SCRAPPY_FRANCE_TRAVAIL_SCOPE="api_offresdemploiv2 o2dsoffre"
+export SCRAPPY_FRANCE_TRAVAIL_LOCATION="75"
+export SCRAPPY_FRANCE_TRAVAIL_CONTRACT="CDI"
+```
+
+Optional endpoint overrides:
+
+```bash
+export SCRAPPY_FRANCE_TRAVAIL_TOKEN_URL="https://entreprise.francetravail.fr/connexion/oauth2/access_token?realm=/partenaire"
+export SCRAPPY_FRANCE_TRAVAIL_SEARCH_URL="https://api.francetravail.io/partenaire/offresdemploi/v2/offres/search"
+```
+
+Smoke France Travail:
+
+```bash
+python3 -m scrappy run \
+  --provider france-travail \
+  --target-offers 20 \
+  --max-pages 2 \
+  --xlsx /tmp/scrappy-france-travail.xlsx
+```
+
+Smoke WTTJ + France Travail:
+
+```bash
+python3 -m scrappy run \
+  --provider wttj-public \
+  --provider france-travail \
+  --target-offers 20 \
+  --max-pages 2 \
+  --xlsx /tmp/scrappy-wttj-france-travail.xlsx
+```
 
 Initial Logics documents:
 
