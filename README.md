@@ -23,6 +23,7 @@ The MVP goal is to collect configured job offers, store every encountered offer 
 - Console output plus XLSX review workbook with `all_scored` and `rejected` sheets.
 - Manual XLSX decision import for `selected`, `maybe`, and `rejected` decisions.
 - Rescore command for replaying the whole history after profile/scoring changes.
+- Skill-gap ("boost") analysis ranking the skills you could develop by how many stored offers they would unlock or boost.
 
 ## Usage
 
@@ -86,6 +87,30 @@ python3 -m scrappy rescore \
   --profile examples/profile.yaml \
   --xlsx reports/top_offers.xlsx
 ```
+
+## Skill-gap analysis
+
+Find which skills, if added to your profile, would boost your CV the most against the
+offers already collected. Each candidate skill (declared in `examples/profile.yaml`
+under `growth.candidate_skills`) is evaluated by re-scoring every stored offer as if you
+already mastered it:
+
+- `offers_unlocked`: offers that flip from non-eligible to eligible (blocked only by the
+  missing domain skill);
+- `offers_boosted`: offers whose score increases;
+- `total_score_gain` / `avg_score_gain`: how much score the skill adds.
+
+```bash
+python3 -m scrappy skill-gaps \
+  --db data/scrappy.sqlite \
+  --profile examples/profile.yaml \
+  --top 10 \
+  --xlsx reports/skill_gaps.xlsx
+```
+
+The console prints the ranked skills with example offers; the XLSX `skill_boosts` sheet
+holds the full ranking. Edit `growth.candidate_skills` to evaluate any skills you are
+considering learning.
 
 ## Provider status
 

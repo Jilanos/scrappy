@@ -5,9 +5,16 @@ from pathlib import Path
 
 from scrappy.connectors import FranceTravailConnector, IndeedApiConnector, WttjPublicConnector
 from scrappy.connectors.base import DiscoveryResult
+from scrappy.growth import skill_boosts
 from scrappy.models import RankedOffer
 from scrappy.profile import load_profile, profile_terms
-from scrappy.reporting import print_console, read_review_rows, write_xlsx
+from scrappy.reporting import (
+    print_console,
+    print_skill_boosts,
+    read_review_rows,
+    write_skill_boosts_xlsx,
+    write_xlsx,
+)
 from scrappy.scoring import score_offer
 from scrappy.storage import (
     connect,
@@ -25,6 +32,7 @@ from scrappy.storage import (
 DEFAULT_DB = "data/scrappy.sqlite"
 DEFAULT_PROFILE = "examples/profile.yaml"
 DEFAULT_REPORT = "reports/top_offers.xlsx"
+DEFAULT_SKILL_GAPS_REPORT = "reports/skill_gaps.xlsx"
 DEFAULT_QUERIES = [
     "electronics engineer",
     "signal processing engineer",
@@ -67,6 +75,15 @@ def main(argv: list[str] | None = None) -> None:
     import_parser.add_argument("--xlsx", default=DEFAULT_REPORT)
     import_parser.add_argument("--sheet", default="all_scored")
 
+    skill_gaps_parser = subparsers.add_parser(
+        "skill-gaps",
+        help="Rank candidate skills by how many stored offers they would unlock or boost.",
+    )
+    skill_gaps_parser.add_argument("--db", default=DEFAULT_DB)
+    skill_gaps_parser.add_argument("--profile", default=DEFAULT_PROFILE)
+    skill_gaps_parser.add_argument("--top", type=int, default=10)
+    skill_gaps_parser.add_argument("--xlsx", default=DEFAULT_SKILL_GAPS_REPORT)
+
     args = parser.parse_args(argv)
     if args.command == "init-db":
         _init_db(args.db)
@@ -76,6 +93,8 @@ def main(argv: list[str] | None = None) -> None:
         _rescore(args)
     elif args.command == "import-reviews":
         _import_reviews(args)
+    elif args.command == "skill-gaps":
+        _skill_gaps(args)
 
 
 def _init_db(db_path: str) -> None:
@@ -190,6 +209,19 @@ def _import_reviews(args: argparse.Namespace) -> None:
     print(f"Imported reviews: {imported}")
     print(f"Skipped empty decisions: {skipped_empty}")
     print(f"Skipped missing offers: {skipped_missing}")
+
+
+def _skill_gaps(args: argparse.Namespace) -> None:
+    profile = load_profile(args.profile)
+    with connect(args.db) as conn:
+        init_db(conn)
+        offers = [offer for _offer_id, offer in iter_offers(conn)]
+    boosts = skill_boosts(offers, profile)
+    print(f"Analyzed offers: {len(offers)}")
+    print(f"Candidate skills with impact: {len(boosts)}")
+    print_skill_boosts(boosts[: args.top])
+    write_skill_boosts_xlsx(args.xlsx, boosts)
+    print(f"Skill-gap report: {args.xlsx}")
 
 
 def _profile_version(profile: dict) -> str:

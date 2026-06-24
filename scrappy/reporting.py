@@ -5,7 +5,19 @@ import zipfile
 from pathlib import Path
 from xml.etree import ElementTree
 
+from scrappy.growth import SkillBoost
 from scrappy.models import RankedOffer
+
+
+SKILL_BOOST_HEADERS = [
+    "rank",
+    "skill",
+    "offers_unlocked",
+    "offers_boosted",
+    "total_score_gain",
+    "avg_score_gain",
+    "example_offers",
+]
 
 
 HEADERS = [
@@ -49,6 +61,39 @@ def print_console(ranked: list[RankedOffer]) -> None:
             print("   strengths: " + "; ".join(score.strengths[:3]))
         if score.gaps:
             print("   gaps: " + "; ".join(score.gaps[:3]))
+
+
+def print_skill_boosts(boosts: list[SkillBoost]) -> None:
+    if not boosts:
+        print("No skill boosts: no candidate skills would change any stored offer.")
+        return
+    for index, boost in enumerate(boosts, start=1):
+        print(
+            f"{index}. {boost.skill} -> unlocks {boost.offers_unlocked} offer(s), "
+            f"boosts {boost.offers_boosted} (+{boost.total_score_gain} pts total, "
+            f"avg +{boost.avg_score_gain})"
+        )
+        if boost.example_offers:
+            print("   e.g. " + "; ".join(boost.example_offers[:3]))
+
+
+def write_skill_boosts_xlsx(path: str | Path, boosts: list[SkillBoost]) -> None:
+    output = Path(path)
+    output.parent.mkdir(parents=True, exist_ok=True)
+    rows = [SKILL_BOOST_HEADERS]
+    for index, boost in enumerate(boosts, start=1):
+        rows.append(
+            [
+                str(index),
+                boost.skill,
+                str(boost.offers_unlocked),
+                str(boost.offers_boosted),
+                str(boost.total_score_gain),
+                str(boost.avg_score_gain),
+                "; ".join(boost.example_offers),
+            ]
+        )
+    _write_minimal_xlsx(output, {"skill_boosts": rows})
 
 
 def write_xlsx(path: str | Path, ranked: list[RankedOffer]) -> None:

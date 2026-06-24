@@ -50,6 +50,37 @@ def test_import_reviews_command_persists_xlsx_decisions(tmp_path, capsys) -> Non
     assert rows[0]["review_note"] == "top match"
 
 
+def test_skill_gaps_command_ranks_unlocking_skill(tmp_path, capsys) -> None:
+    db = tmp_path / "scrappy.sqlite"
+    xlsx = tmp_path / "skill_gaps.xlsx"
+    # Paris/CDI/confirmed offer whose only domain signal is "machine learning",
+    # which is a growth candidate but not yet in examples/profile.yaml.
+    offer = Offer(
+        source="fixture",
+        source_id="ml-1",
+        url="https://example.test/ml-1",
+        title="Confirmed Machine Learning Engineer",
+        company="Deeptech",
+        location="Paris",
+        seniority="confirmed",
+        contract_type="Full-Time",
+        description="Machine learning models for production systems.",
+    )
+
+    with connect(db) as conn:
+        init_db(conn)
+        run_id = create_run(conn, "fixture", 1)
+        upsert_offer(conn, run_id, offer)
+
+    main(["skill-gaps", "--db", str(db), "--xlsx", str(xlsx)])
+
+    captured = capsys.readouterr()
+    assert "Analyzed offers: 1" in captured.out
+    assert "machine learning" in captured.out
+    assert "unlocks 1 offer" in captured.out
+    assert xlsx.exists()
+
+
 def test_run_continues_with_warning_when_indeed_provider_is_not_configured(tmp_path, capsys, monkeypatch) -> None:
     db = tmp_path / "scrappy.sqlite"
     xlsx = tmp_path / "out.xlsx"

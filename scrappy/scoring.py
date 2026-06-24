@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import functools
 import re
 from collections.abc import Iterable
 
@@ -227,9 +228,22 @@ def _matched_terms(text: str, terms: Iterable[str]) -> list[str]:
     hits = []
     for term in terms:
         normalized = str(term).strip().lower()
-        if normalized and normalized in text:
+        if normalized and _term_regex(normalized).search(text):
             hits.append(str(term))
     return hits
+
+
+@functools.lru_cache(maxsize=None)
+def _term_regex(term: str) -> re.Pattern[str]:
+    """Match ``term`` only at token edges so short skills do not match inside words.
+
+    Naive substring matching treats a one-letter skill such as ``C`` as present in
+    any text containing "science" or "electronics". Anchoring on non-alphanumeric
+    boundaries keeps ``C``/``C++``/``C#`` precise while still matching multi-word
+    skills like ``signal processing``.
+    """
+
+    return re.compile(rf"(?<![a-z0-9]){re.escape(term)}(?![a-z0-9])")
 
 
 def _domain_primary_hits(primary_hits: Iterable[str]) -> list[str]:

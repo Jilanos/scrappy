@@ -53,6 +53,31 @@ search:
     - hardware validation engineer
     - prototype validation engineer
     - technical project engineer
+growth:
+  # Skills the candidate is willing/able to develop. The skill-gaps analysis
+  # re-scores every stored offer as if each of these were already mastered, then
+  # ranks them by how many offers they would unlock or boost. Edit freely.
+  candidate_skills:
+    - embedded systems
+    - embedded C
+    - RTL
+    - VHDL
+    - Verilog
+    - DSP
+    - PCB design
+    - RF
+    - microcontroller
+    - real-time
+    - machine learning
+    - deep learning
+    - computer vision
+    - image processing
+    - PyTorch
+    - TensorFlow
+    - Zynq
+    - Vivado
+    - CAN bus
+    - Linux
 exclusions:
   hard_terms:
     - internship
