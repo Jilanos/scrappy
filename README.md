@@ -117,6 +117,42 @@ export SCRAPPY_INDEED_LOCATION="Paris"
 
 The adapter sends common query parameters (`q`, `query`, `l`, `location`, `start`, `page`, `limit`) and accepts common JSON result shapes such as `jobs`, `results`, `data`, or `items`.
 
+Recommended third-party path:
+
+- Apify is the recommended first provider to validate because it offers a documented synchronous API path that runs an Indeed actor and returns dataset items directly.
+- Default actor: `misceres~indeed-scraper`, maintained on Apify, with documented input fields `country`, `location`, `position`, `maxItems`, and `saveOnlyUniqueItems`.
+- Alternative Apify actor: `borderline~indeed-scraper`, with pay-per-result pricing and a different input shape. Set `SCRAPPY_INDEED_APIFY_ACTOR=borderline~indeed-scraper` to use that payload shape.
+- HasData is a credible alternative with normalized Indeed data and a free trial, but its scraper flow is asynchronous and requires job polling, so it is not the first integration target for the local CLI.
+
+Provider comparison:
+
+| Option | Strength | Limitation | Decision |
+| --- | --- | --- | --- |
+| Apify `misceres~indeed-scraper` | Simple synchronous API, documented `position/location/maxItems` input, JSON dataset output, free account path | Requires Apify token and paid usage beyond trial/free credits | Selected default |
+| Apify `borderline~indeed-scraper` | Higher current rating, recent updates, pay-per-result actor, supports `query/country/location/maxRows` | Different actor-specific input shape and higher listed per-1k price | Supported by config |
+| HasData Indeed Jobs API | Normalized Indeed data, 60+ locales, documented fields, free trial | Asynchronous job + polling flow, 10 credits per returned row | Fallback candidate |
+| Browse AI / Oxylabs style extractors | Hosted extraction, anti-bot handling | More product-specific setup, less direct local CLI fit, potential cost/terms review | Not selected for first validation |
+
+Configure Apify:
+
+```bash
+export SCRAPPY_INDEED_PROVIDER="apify"
+export SCRAPPY_INDEED_APIFY_TOKEN="apify_api_..."
+export SCRAPPY_INDEED_APIFY_ACTOR="misceres~indeed-scraper"
+export SCRAPPY_INDEED_COUNTRY="FR"
+export SCRAPPY_INDEED_LOCATION="Paris"
+```
+
+Smoke Apify Indeed:
+
+```bash
+python3 -m scrappy run \
+  --provider indeed-api \
+  --target-offers 20 \
+  --max-pages 2 \
+  --xlsx /tmp/scrappy-indeed-real.xlsx
+```
+
 Multi-platform deduplication:
 
 - Offers are still stored with their original `source` and `source_id`.
