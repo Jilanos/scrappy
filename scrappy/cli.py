@@ -3,8 +3,8 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
-from scrappy.connectors import WttjPublicConnector
-from scrappy.connectors.wttj import DiscoveryResult
+from scrappy.connectors import IndeedApiConnector, WttjPublicConnector
+from scrappy.connectors.base import DiscoveryResult
 from scrappy.models import RankedOffer
 from scrappy.profile import load_profile, profile_terms
 from scrappy.reporting import print_console, read_review_rows, write_xlsx
@@ -43,7 +43,12 @@ def main(argv: list[str] | None = None) -> None:
     run_parser = subparsers.add_parser("run", help="Collect, score, persist, and export a top shortlist.")
     run_parser.add_argument("--db", default=DEFAULT_DB)
     run_parser.add_argument("--profile", default=DEFAULT_PROFILE)
-    run_parser.add_argument("--provider", default="wttj-public", choices=["wttj-public"])
+    run_parser.add_argument(
+        "--provider",
+        action="append",
+        choices=["wttj-public", "indeed-api"],
+        help="Provider to collect from. Repeat for multi-platform runs. Defaults to wttj-public.",
+    )
     run_parser.add_argument("--query", action="append", help="Override profile search query. Repeatable.")
     run_parser.add_argument("--max-pages", type=int, default=15)
     run_parser.add_argument("--target-offers", type=int, default=300)
@@ -82,31 +87,55 @@ def _init_db(db_path: str) -> None:
 def _run(args: argparse.Namespace) -> None:
     profile = load_profile(args.profile)
     queries = args.query or _default_queries(profile)
-    connector = WttjPublicConnector()
+    connectors = [_connector(provider) for provider in (args.provider or ["wttj-public"])]
 
     with connect(args.db) as conn:
         init_db(conn)
-        run_id = create_run(conn, connector.name, len(queries))
-        discovery = connector.discover_with_stats(
-            queries,
-            max_pages=args.max_pages,
-            target_count=args.target_offers,
-            hits_per_page=args.hits_per_page,
-        )
-        offers = discovery.offers
-        changed_count = 0
-        for offer in offers:
-            offer_id, changed = upsert_offer(conn, run_id, offer)
-            if changed:
-                changed_count += 1
-                save_analysis(conn, run_id, offer_id, _profile_version(profile), score_offer(offer, profile))
-        finish_run(conn, run_id, discovered=len(offers), changed=changed_count)
+        discoveries: list[DiscoveryResult] = []
+        total_changed = 0
+        for connector in connectors:
+            run_id = create_run(conn, connector.name, len(queries))
+            try:
+                discovery = connector.discover_with_stats(
+                    queries,
+                    max_pages=args.max_pages,
+                    target_count=args.target_offers,
+                    hits_per_page=args.hits_per_page,
+                )
+            except RuntimeError as error:
+                finish_run(conn, run_id, discovered=0, changed=0, status="failed")
+                discoveries.append(
+                    DiscoveryResult(
+                        provider=connector.name,
+                        offers=[],
+                        pages=[],
+                        raw_hits=0,
+                        duplicate_hits=0,
+                        target_reached=False,
+                        error=str(error),
+                    )
+                )
+                continue
+
+            changed_count = 0
+            for offer in discovery.offers:
+                offer_id, changed = upsert_offer(conn, run_id, offer)
+                if changed:
+                    changed_count += 1
+                    save_analysis(conn, run_id, offer_id, _profile_version(profile), score_offer(offer, profile))
+            finish_run(conn, run_id, discovered=len(discovery.offers), changed=changed_count)
+            total_changed += changed_count
+            discoveries.append(discovery)
         ranked = latest_ranked(conn, limit=None)
 
-    print(f"Provider: {connector.name}")
-    print(f"Discovered: {len(offers)}")
-    _print_discovery_diagnostics(discovery, args.target_offers, args.max_pages, args.hits_per_page)
-    print(f"New or changed: {changed_count}")
+    for discovery in discoveries:
+        print(f"Provider: {discovery.provider}")
+        if discovery.error:
+            print(f"Warning: provider failed: {discovery.error}")
+            continue
+        print(f"Discovered: {len(discovery.offers)}")
+        _print_discovery_diagnostics(discovery, args.target_offers, args.max_pages, args.hits_per_page)
+    print(f"New or changed: {total_changed}")
     _print_top_eligible(ranked, args.top)
     write_xlsx(args.xlsx, ranked)
     print(f"XLSX report: {args.xlsx}")
@@ -176,6 +205,14 @@ def _print_top_eligible(ranked: list[RankedOffer], top: int) -> None:
 def _default_queries(profile: dict) -> list[str]:
     queries = profile_terms(profile, "search", "default_queries")
     return queries or DEFAULT_QUERIES
+
+
+def _connector(provider: str):
+    if provider == "wttj-public":
+        return WttjPublicConnector()
+    if provider == "indeed-api":
+        return IndeedApiConnector.from_env()
+    raise ValueError(f"Unsupported provider: {provider}")
 
 
 def _print_discovery_diagnostics(

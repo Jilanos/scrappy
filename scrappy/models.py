@@ -35,3 +35,5 @@ class RankedOffer:
     offer: Offer
     score: ScoreResult
     offer_id: int | None = None
+    merged_sources: list[str] = field(default_factory=list)
+    duplicate_reason: str = ""

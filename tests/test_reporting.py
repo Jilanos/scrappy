@@ -11,6 +11,8 @@ def test_writes_review_xlsx_with_all_scored_and_rejected_sheets(tmp_path) -> Non
             offer_id=12,
             offer=Offer(source="fixture", source_id="1", url="https://example.test", title="Engineer"),
             score=ScoreResult(score=80, eligible=True, location_status="paris", seniority_status="senior"),
+            merged_sources=["fixture:1", "indeed_api:dup"],
+            duplicate_reason="same normalized title/company/location",
         ),
         RankedOffer(
             offer_id=13,
@@ -31,6 +33,8 @@ def test_writes_review_xlsx_with_all_scored_and_rejected_sheets(tmp_path) -> Non
 
     rows = read_review_rows(output)
     assert rows[0]["offer_id"] == "12"
+    assert rows[0]["merged_sources"] == "fixture:1; indeed_api:dup"
+    assert rows[0]["duplicate_reason"] == "same normalized title/company/location"
     assert rows[0]["decision"] == ""
     assert rows[1]["source_id"] == "2"
 

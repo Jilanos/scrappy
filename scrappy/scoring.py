@@ -74,6 +74,10 @@ def score_offer(offer: Offer, profile: dict) -> ScoreResult:
     if _contains_any(text, profile_terms(profile, "exclusions", "downrank_terms")):
         score -= 15
         risks.append("ESN/consulting signal")
+    downrank_signals = _downrank_signals(text)
+    if downrank_signals:
+        score -= min(20, 8 * len(downrank_signals))
+        risks.extend(downrank_signals)
     if _contains_any(text, ["salary", "salaire", "compensation"]):
         reasons.append("salary metadata present")
     else:
@@ -196,6 +200,27 @@ def _hard_exclusion(text: str) -> str | None:
     if military and not adjacent:
         return "excluded direct military role"
     return None
+
+
+def _downrank_signals(text: str) -> list[str]:
+    signals = []
+    if _contains_any(text, ["sponsored", "sponsorise", "promoted", "promu"]):
+        signals.append("sponsored/promoted signal")
+    if _contains_any(text, ["repost", "reposted", "republication", "republished"]):
+        signals.append("repost signal")
+    if _contains_any(
+        text,
+        [
+            "recruitment agency",
+            "recruiting agency",
+            "staffing agency",
+            "cabinet de recrutement",
+            "agence de recrutement",
+            "talent acquisition agency",
+        ],
+    ):
+        signals.append("recruitment agency signal")
+    return signals
 
 
 def _matched_terms(text: str, terms: Iterable[str]) -> list[str]:

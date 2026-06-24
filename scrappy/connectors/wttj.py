@@ -11,6 +11,7 @@ from urllib.error import HTTPError, URLError
 from urllib.parse import quote_plus, urlencode, urljoin
 from urllib.request import Request, urlopen
 
+from scrappy.connectors.base import DiscoveryResult, SearchPage
 from scrappy.models import Offer
 
 
@@ -19,25 +20,6 @@ ALGOLIA_APP_ID = "CSEKHVMS53"
 ALGOLIA_SEARCH_KEY = "4bd8f6215d0cc52b26430765769e65a0"
 ALGOLIA_ENDPOINT = "https://csekhvms53-dsn.algolia.net/1/indexes/*/queries"
 ALGOLIA_JOBS_INDEX = "wk_cms_jobs_production"
-
-
-@dataclass(frozen=True)
-class SearchPage:
-    offers: list[Offer]
-    query: str
-    page: int
-    hits: int
-    nb_hits: int
-    nb_pages: int
-
-
-@dataclass(frozen=True)
-class DiscoveryResult:
-    offers: list[Offer]
-    pages: list[SearchPage]
-    raw_hits: int
-    duplicate_hits: int
-    target_reached: bool
 
 
 @dataclass(frozen=True)
@@ -84,6 +66,7 @@ class WttjPublicConnector:
                     offers[offer.source_id] = offer
                 if len(offers) >= target_count:
                     return DiscoveryResult(
+                        provider=self.name,
                         offers=list(offers.values()),
                         pages=pages,
                         raw_hits=raw_hits,
@@ -91,6 +74,7 @@ class WttjPublicConnector:
                         target_reached=True,
                     )
         return DiscoveryResult(
+            provider=self.name,
             offers=list(offers.values()),
             pages=pages,
             raw_hits=raw_hits,
