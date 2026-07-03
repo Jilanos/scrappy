@@ -4,6 +4,7 @@ import hashlib
 import json
 import os
 import re
+import time
 from dataclasses import dataclass, field
 from typing import Iterable
 from urllib.error import HTTPError, URLError
@@ -19,6 +20,8 @@ DEFAULT_SEARCH_URL = "https://api.francetravail.io/partenaire/offresdemploi/v2/o
 FALLBACK_SEARCH_URL = "https://api.emploi-store.fr/partenaire/offresdemploi/v2/offres/search"
 DEFAULT_SCOPE = "api_offresdemploiv2 o2dsoffre"
 DEFAULT_LOCATION = "75"
+DEFAULT_REQUEST_INTERVAL_SECONDS = 0.4
+MAX_RANGE_END = 1149
 
 
 @dataclass
@@ -32,7 +35,9 @@ class FranceTravailConnector:
     contract_type: str = "CDI"
     timeout_seconds: int = 20
     user_agent: str = "scrappy-local-job-review/0.1"
+    request_interval_seconds: float = DEFAULT_REQUEST_INTERVAL_SECONDS
     _access_token: str = field(default="", init=False, repr=False)
+    _last_request_at: float = field(default=0.0, init=False, repr=False)
 
     @classmethod
     def from_env(cls) -> "FranceTravailConnector":
@@ -46,6 +51,9 @@ class FranceTravailConnector:
             or DEFAULT_TOKEN_URL,
             location=os.environ.get("SCRAPPY_FRANCE_TRAVAIL_LOCATION", DEFAULT_LOCATION).strip() or DEFAULT_LOCATION,
             contract_type=os.environ.get("SCRAPPY_FRANCE_TRAVAIL_CONTRACT", "CDI").strip(),
+            request_interval_seconds=float(
+                os.environ.get("SCRAPPY_FRANCE_TRAVAIL_REQUEST_INTERVAL_SECONDS", DEFAULT_REQUEST_INTERVAL_SECONDS)
+            ),
         )
 
     @property
@@ -72,12 +80,21 @@ class FranceTravailConnector:
         max_pages: int = 5,
         target_count: int = 100,
         hits_per_page: int = 20,
+        time_budget_seconds: int = 0,
     ) -> DiscoveryResult:
         self._require_credentials()
         offers: dict[str, Offer] = {}
         pages: list[SearchPage] = []
         raw_hits = 0
         page_size = min(max(1, hits_per_page), 150)
+        if time_budget_seconds > 0:
+            return self._discover_until_deadline(
+                queries,
+                max_pages=max_pages,
+                target_count=target_count,
+                hits_per_page=page_size,
+                time_budget_seconds=time_budget_seconds,
+            )
         for page in range(max_pages):
             for query in queries:
                 search_page = self.search_page(query=_france_travail_query(query), page=page, hits_per_page=page_size)
@@ -87,6 +104,39 @@ class FranceTravailConnector:
                     offers[offer.source_id] = offer
                 if len(offers) >= target_count:
                     return self._result(offers, pages, raw_hits, True)
+        return self._result(offers, pages, raw_hits, len(offers) >= target_count)
+
+    def _discover_until_deadline(
+        self,
+        queries: Iterable[str],
+        max_pages: int,
+        target_count: int,
+        hits_per_page: int,
+        time_budget_seconds: int,
+    ) -> DiscoveryResult:
+        offers: dict[str, Offer] = {}
+        pages: list[SearchPage] = []
+        raw_hits = 0
+        deadline = time.monotonic() + max(1, time_budget_seconds)
+        translated_queries = _unique(_france_travail_query(query) for query in queries)
+        if not translated_queries:
+            translated_queries = [_france_travail_query("")]
+        max_api_pages = (MAX_RANGE_END + hits_per_page) // hits_per_page
+        page_limit = min(max_pages, max_api_pages)
+
+        for page in range(page_limit):
+            for query in translated_queries:
+                if len(offers) >= target_count or time.monotonic() >= deadline:
+                    return self._result(offers, pages, raw_hits, len(offers) >= target_count)
+                try:
+                    search_page = self.search_page(query=query, page=page, hits_per_page=hits_per_page)
+                except RuntimeError:
+                    continue
+                pages.append(search_page)
+                raw_hits += search_page.hits
+                for offer in search_page.offers:
+                    offers[offer.source_id] = offer
+
         return self._result(offers, pages, raw_hits, len(offers) >= target_count)
 
     def search_page(self, query: str, page: int = 0, hits_per_page: int = 20) -> SearchPage:
@@ -150,7 +200,7 @@ class FranceTravailConnector:
             content_hash=content_hash,
         )
 
-    def _fetch_search(self, query: str, result_range: str) -> tuple[dict, str]:
+    def _fetch_search(self, query: str, result_range: str, retries: int = 2) -> tuple[dict, str]:
         params = {
             "motsCles": query,
             "range": result_range,
@@ -170,18 +220,28 @@ class FranceTravailConnector:
                 "User-Agent": self.user_agent,
             },
         )
-        try:
-            with urlopen(request, timeout=self.timeout_seconds) as response:
-                body = response.read().decode("utf-8")
-                if response.status == 204 or not body.strip():
-                    return {"resultats": [], "total": 0}, response.headers.get("Content-Range", "")
-                return json.loads(body), response.headers.get("Content-Range", "")
-        except HTTPError as error:
-            if error.code == 204:
-                return {"resultats": [], "total": 0}, ""
-            raise RuntimeError(f"France Travail search failed for query={query!r}: HTTP {error.code}") from error
-        except (URLError, TimeoutError, json.JSONDecodeError) as error:
-            raise RuntimeError(f"France Travail search failed for query={query!r}") from error
+        for attempt in range(retries + 1):
+            self._throttle()
+            try:
+                with urlopen(request, timeout=self.timeout_seconds) as response:
+                    body = response.read().decode("utf-8")
+                    if response.status == 204 or not body.strip():
+                        return {"resultats": [], "total": 0}, response.headers.get("Content-Range", "")
+                    return json.loads(body), response.headers.get("Content-Range", "")
+            except HTTPError as error:
+                if error.code == 204:
+                    return {"resultats": [], "total": 0}, ""
+                if (error.code == 429 or 500 <= error.code <= 599) and attempt < retries:
+                    retry_after = _retry_after_seconds(error.headers.get("Retry-After", ""))
+                    time.sleep(retry_after or max(self.request_interval_seconds * 2, 1.0))
+                    continue
+                raise RuntimeError(f"France Travail search failed for query={query!r}: HTTP {error.code}") from error
+            except (URLError, TimeoutError, json.JSONDecodeError) as error:
+                if attempt < retries:
+                    time.sleep(max(self.request_interval_seconds, 0.2))
+                    continue
+                raise RuntimeError(f"France Travail search failed for query={query!r}") from error
+        raise RuntimeError(f"France Travail search failed for query={query!r}")
 
     def access_token(self) -> str:
         if not self._access_token:
@@ -226,6 +286,15 @@ class FranceTravailConnector:
                 "France Travail connector requires SCRAPPY_FRANCE_TRAVAIL_CLIENT_ID and "
                 "SCRAPPY_FRANCE_TRAVAIL_CLIENT_SECRET"
             )
+
+    def _throttle(self) -> None:
+        if self.request_interval_seconds <= 0:
+            return
+        elapsed = time.monotonic() - self._last_request_at
+        wait = self.request_interval_seconds - elapsed
+        if wait > 0:
+            time.sleep(wait)
+        self._last_request_at = time.monotonic()
 
     def _result(
         self,
@@ -294,11 +363,52 @@ def _nb_pages(total: int, hits_per_page: int) -> int:
     return (total + hits_per_page - 1) // hits_per_page
 
 
+def _retry_after_seconds(value: str) -> float:
+    try:
+        return max(0.0, float(value))
+    except ValueError:
+        return 0.0
+
+
+def _unique(values: Iterable[str]) -> list[str]:
+    seen: set[str] = set()
+    result: list[str] = []
+    for value in values:
+        normalized = value.strip()
+        if not normalized or normalized in seen:
+            continue
+        seen.add(normalized)
+        result.append(normalized)
+    return result
+
+
 def _france_travail_query(query: str) -> str:
     translations = {
         "electronics engineer": "electronique",
         "signal processing engineer": "traitement signal",
         "r&d engineer": "ingenieur recherche developpement",
         "medical imaging engineer": "imagerie medicale",
+        "deep tech engineer": "ingenieur deep tech",
+        "electrical integration engineer": "integration electrique",
+        "system integration engineer": "integration systeme",
+        "ultrasound engineer": "ultrasons",
+        "biomedical engineer": "biomedical",
+        "fpga engineer": "FPGA",
+        "python scientific tooling engineer": "python scientifique",
+        "hardware validation engineer": "validation materiel",
+        "prototype validation engineer": "validation prototype",
+        "technical project engineer": "chef projet technique",
+        "signal processing": "traitement signal",
+        "electronics": "electronique",
+        "instrumentation": "instrumentation",
+        "electrical architecture": "architecture electrique",
+        "medical imaging": "imagerie medicale",
+        "ultrasound": "ultrasons",
+        "system integration": "integration systeme",
+        "hardware debugging": "debug materiel",
+        "data science": "data science",
+        "project management": "gestion projet",
+        "supplier coordination": "coordination fournisseur",
+        "prototype validation": "validation prototype",
     }
     return translations.get(query.strip().lower(), query)

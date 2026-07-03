@@ -220,6 +220,26 @@ python3 -m scrappy run \
   --xlsx /tmp/scrappy-france-travail.xlsx
 ```
 
+Broader France Travail collection over 60 to 100 seconds:
+
+```bash
+python3 -m scrappy run \
+  --provider france-travail \
+  --time-budget-seconds 100 \
+  --request-interval-seconds 0.4 \
+  --expand-profile-queries \
+  --hits-per-page 150 \
+  --max-pages 8 \
+  --target-offers 1000 \
+  --xlsx reports/top_offers_france_travail_deep.xlsx
+```
+
+This mode keeps a steady request pace below the commonly documented 3 requests/second
+limit, fetches the largest allowed result pages (`range` windows of 150 offers), rotates
+across profile default queries, target roles and skills, and retries transient throttling
+responses. The France Travail API range cap means a single broad query can expose up to
+about 1,150 offers; using more query variants is what expands the catalogue beyond that.
+
 Smoke WTTJ + France Travail:
 
 ```bash

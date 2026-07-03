@@ -61,6 +61,23 @@ def main(argv: list[str] | None = None) -> None:
     run_parser.add_argument("--max-pages", type=int, default=15)
     run_parser.add_argument("--target-offers", type=int, default=300)
     run_parser.add_argument("--hits-per-page", type=int, default=20)
+    run_parser.add_argument(
+        "--time-budget-seconds",
+        type=int,
+        default=0,
+        help="Keep collecting for up to this many seconds when a provider supports timed collection.",
+    )
+    run_parser.add_argument(
+        "--request-interval-seconds",
+        type=float,
+        default=None,
+        help="Minimum delay between provider requests when supported. For France Travail, 0.4 stays below 3 req/s.",
+    )
+    run_parser.add_argument(
+        "--expand-profile-queries",
+        action="store_true",
+        help="Add target roles and profile skills to the default search queries for broader collection.",
+    )
     run_parser.add_argument("--top", type=int, default=5)
     run_parser.add_argument("--xlsx", default=DEFAULT_REPORT)
 
@@ -105,8 +122,11 @@ def _init_db(db_path: str) -> None:
 
 def _run(args: argparse.Namespace) -> None:
     profile = load_profile(args.profile)
-    queries = args.query or _default_queries(profile)
+    queries = args.query or _default_queries(profile, expand=args.expand_profile_queries)
     connectors = [_connector(provider) for provider in (args.provider or ["wttj-public"])]
+    for connector in connectors:
+        if args.request_interval_seconds is not None and hasattr(connector, "request_interval_seconds"):
+            connector.request_interval_seconds = args.request_interval_seconds
 
     with connect(args.db) as conn:
         init_db(conn)
@@ -115,12 +135,14 @@ def _run(args: argparse.Namespace) -> None:
         for connector in connectors:
             run_id = create_run(conn, connector.name, len(queries))
             try:
-                discovery = connector.discover_with_stats(
-                    queries,
-                    max_pages=args.max_pages,
-                    target_count=args.target_offers,
-                    hits_per_page=args.hits_per_page,
-                )
+                discovery_kwargs = {
+                    "max_pages": args.max_pages,
+                    "target_count": args.target_offers,
+                    "hits_per_page": args.hits_per_page,
+                }
+                if args.time_budget_seconds and connector.name == "france_travail":
+                    discovery_kwargs["time_budget_seconds"] = args.time_budget_seconds
+                discovery = connector.discover_with_stats(queries, **discovery_kwargs)
             except RuntimeError as error:
                 finish_run(conn, run_id, discovered=0, changed=0, status="failed")
                 discoveries.append(
@@ -234,9 +256,30 @@ def _print_top_eligible(ranked: list[RankedOffer], top: int) -> None:
     print_console(eligible[:top])
 
 
-def _default_queries(profile: dict) -> list[str]:
+def _default_queries(profile: dict, expand: bool = False) -> list[str]:
     queries = profile_terms(profile, "search", "default_queries")
-    return queries or DEFAULT_QUERIES
+    if not expand:
+        return queries or DEFAULT_QUERIES
+    expanded = [
+        *(queries or DEFAULT_QUERIES),
+        *profile_terms(profile, "search", "target_roles"),
+        *profile_terms(profile, "skills", "primary"),
+        *profile_terms(profile, "skills", "secondary"),
+    ]
+    return _unique(expanded)
+
+
+def _unique(values: list[str]) -> list[str]:
+    seen: set[str] = set()
+    result: list[str] = []
+    for value in values:
+        normalized = value.strip()
+        key = normalized.lower()
+        if not normalized or key in seen:
+            continue
+        seen.add(key)
+        result.append(normalized)
+    return result
 
 
 def _connector(provider: str):

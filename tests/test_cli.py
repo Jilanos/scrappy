@@ -1,4 +1,4 @@
-from scrappy.cli import main
+from scrappy.cli import _default_queries, main
 from scrappy.models import Offer
 from scrappy.reporting import HEADERS, _write_minimal_xlsx
 from scrappy.storage import connect, create_run, init_db, iter_manual_reviews, upsert_offer
@@ -138,3 +138,20 @@ def test_run_continues_with_warning_when_france_travail_is_not_configured(tmp_pa
     assert "Warning: provider failed" in captured.out
     assert "SCRAPPY_FRANCE_TRAVAIL_CLIENT_ID" in captured.out
     assert xlsx.exists()
+
+
+def test_default_queries_can_expand_with_profile_terms() -> None:
+    profile = {
+        "search": {
+            "default_queries": ["electronics engineer"],
+            "target_roles": ["R&D engineer"],
+        },
+        "skills": {
+            "primary": ["signal processing"],
+            "secondary": ["MATLAB"],
+        },
+    }
+
+    queries = _default_queries(profile, expand=True)
+
+    assert queries == ["electronics engineer", "R&D engineer", "signal processing", "MATLAB"]

@@ -85,6 +85,94 @@ def test_discovers_france_travail_offers_with_pagination_stats() -> None:
     assert result.offers[0].source_id == "1"
 
 
+def test_timed_france_travail_collection_uses_large_ranges_and_query_round_robin() -> None:
+    calls = []
+
+    class FixtureConnector(FranceTravailConnector):
+        def access_token(self) -> str:
+            return "token"
+
+        def _fetch_search(self, query: str, result_range: str):
+            calls.append((query, result_range))
+            offer_id = f"{query}-{result_range}"
+            return (
+                {
+                    "resultats": [
+                        {
+                            "id": offer_id,
+                            "intitule": f"Ingenieur {query}",
+                            "description": "Signal processing",
+                            "entreprise": {"nom": "Deeptech"},
+                            "lieuTravail": {"libelle": "75 - Paris"},
+                            "typeContrat": "CDI",
+                        }
+                    ]
+                },
+                "0-0/1000",
+            )
+
+    result = FixtureConnector(
+        client_id="id",
+        client_secret="secret",
+        request_interval_seconds=0,
+    ).discover_with_stats(
+        ["electronics engineer", "signal processing engineer"],
+        max_pages=2,
+        target_count=4,
+        hits_per_page=150,
+        time_budget_seconds=60,
+    )
+
+    assert calls == [
+        ("electronique", "0-149"),
+        ("traitement signal", "0-149"),
+        ("electronique", "150-299"),
+        ("traitement signal", "150-299"),
+    ]
+    assert len(result.offers) == 4
+    assert result.target_reached is True
+
+
+def test_timed_france_travail_collection_skips_failed_pages() -> None:
+    class FixtureConnector(FranceTravailConnector):
+        def access_token(self) -> str:
+            return "token"
+
+        def _fetch_search(self, query: str, result_range: str):
+            if query == "imagerie medicale":
+                raise RuntimeError("France Travail search failed for query='imagerie medicale': HTTP 500")
+            return (
+                {
+                    "resultats": [
+                        {
+                            "id": f"{query}-{result_range}",
+                            "intitule": f"Ingenieur {query}",
+                            "description": "Signal processing",
+                            "entreprise": {"nom": "Deeptech"},
+                            "lieuTravail": {"libelle": "75 - Paris"},
+                            "typeContrat": "CDI",
+                        }
+                    ]
+                },
+                "0-0/1000",
+            )
+
+    result = FixtureConnector(
+        client_id="id",
+        client_secret="secret",
+        request_interval_seconds=0,
+    ).discover_with_stats(
+        ["medical imaging engineer", "electronics engineer"],
+        max_pages=1,
+        target_count=1,
+        hits_per_page=150,
+        time_budget_seconds=60,
+    )
+
+    assert len(result.offers) == 1
+    assert result.offers[0].source_id == "electronique-0-149"
+
+
 def test_translates_default_profile_query_for_france_travail() -> None:
     class FixtureConnector(FranceTravailConnector):
         def access_token(self) -> str:
