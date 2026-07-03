@@ -94,3 +94,42 @@ def test_merges_cross_source_duplicates_by_normalized_title_company_location(tmp
     assert duplicate_changed
     assert ranked[0].merged_sources == ["wttj_algolia:wttj-1", "indeed_api:indeed-1"]
     assert ranked[0].duplicate_reason == "same normalized title/company/location"
+
+
+def test_cross_source_duplicate_does_not_ping_pong_canonical_content(tmp_path) -> None:
+    db = tmp_path / "scrappy.sqlite"
+    wttj_offer = Offer(
+        source="wttj_algolia",
+        source_id="wttj-1",
+        url="https://wttj.example/job",
+        title="Senior Electronics Engineer",
+        company="Deeptech",
+        location="Paris, France",
+        contract_type="Full-Time",
+        description="Signal processing electronics",
+    )
+    indeed_offer = Offer(
+        source="indeed_api",
+        source_id="indeed-1",
+        url="https://indeed.example/job",
+        title="Electronics Engineer",
+        company="Deeptech",
+        location="Paris",
+        contract_type="Full-Time",
+        description="Signal processing electronics",
+    )
+
+    with connect(db) as conn:
+        init_db(conn)
+        run_id = create_run(conn, "multi", 1)
+        offer_id, _ = upsert_offer(conn, run_id, wttj_offer)
+        upsert_offer(conn, run_id, indeed_offer)
+        second_run = create_run(conn, "multi", 1)
+        _, wttj_changed_again = upsert_offer(conn, second_run, wttj_offer)
+        _, indeed_changed_again = upsert_offer(conn, second_run, indeed_offer)
+        row = conn.execute("SELECT title, url FROM offers WHERE id = ?", (offer_id,)).fetchone()
+
+    assert not wttj_changed_again
+    assert not indeed_changed_again
+    assert row["title"] == "Senior Electronics Engineer"
+    assert row["url"] == "https://wttj.example/job"

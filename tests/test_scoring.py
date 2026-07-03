@@ -184,6 +184,67 @@ def test_rejects_offer_without_primary_skill_match() -> None:
     assert "no primary skill match" in " ".join(result.gaps)
 
 
+def test_accepts_accented_french_telework_offer_outside_paris() -> None:
+    profile = load_profile("examples/profile.yaml")
+    offer = Offer(
+        source="fixture",
+        source_id="10",
+        url="https://example.test/job",
+        title="Ingénieur électronique confirmé",
+        company="Deeptech",
+        location="Lyon",
+        remote="Hybride",
+        contract_type="CDI",
+        description="Instrumentation et FPGA, 4 jours de télétravail par semaine.",
+    )
+
+    result = score_offer(offer, profile)
+
+    assert result.eligible
+    assert result.location_status == "substantial remote hybrid"
+    assert result.seniority_status == "confirmed"
+
+
+def test_rejects_french_offer_requiring_more_than_six_years() -> None:
+    profile = load_profile("examples/profile.yaml")
+    offer = Offer(
+        source="fixture",
+        source_id="11",
+        url="https://example.test/job",
+        title="Ingénieur traitement du signal",
+        company="Deeptech",
+        location="Paris",
+        contract_type="CDI",
+        description="Vous justifiez de 7 ans d'expérience en électronique et traitement du signal.",
+    )
+
+    result = score_offer(offer, profile)
+
+    assert not result.eligible
+    assert result.seniority_status == "too_senior_gt_6_years"
+
+
+def test_hard_exclusion_terms_come_from_profile() -> None:
+    profile = load_profile("examples/profile.yaml")
+    profile["exclusions"]["military_terms"] = ["weapons systems"]
+    profile["exclusions"]["allowed_adjacent_terms"] = ["imaging"]
+    offer = Offer(
+        source="fixture",
+        source_id="12",
+        url="https://example.test/job",
+        title="Confirmed Electronics Engineer",
+        company="Deeptech",
+        location="Paris",
+        contract_type="Full-Time",
+        description="Signal processing for weapons systems.",
+    )
+
+    result = score_offer(offer, profile)
+
+    assert not result.eligible
+    assert "excluded direct military role" in " ".join(result.reasons)
+
+
 def test_rejects_python_only_skill_match() -> None:
     profile = load_profile("examples/profile.yaml")
     offer = Offer(

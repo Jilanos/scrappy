@@ -26,8 +26,8 @@ MAX_RANGE_END = 1149
 
 @dataclass
 class FranceTravailConnector:
-    client_id: str = ""
-    client_secret: str = ""
+    client_id: str = field(default="", repr=False)
+    client_secret: str = field(default="", repr=False)
     scope: str = DEFAULT_SCOPE
     search_url: str = DEFAULT_SEARCH_URL
     token_url: str = DEFAULT_TOKEN_URL
@@ -185,7 +185,13 @@ class FranceTravailConnector:
         url = _offer_url(item, source_id)
         if not source_id:
             source_id = hashlib.sha256((url + title + company).encode("utf-8")).hexdigest()[:20]
-        content_hash = hashlib.sha256(json.dumps(item, sort_keys=True, ensure_ascii=False).encode("utf-8")).hexdigest()
+        remote = _remote_text(item)
+        seniority = str(item.get("experienceLibelle") or "")
+        # Hash the extracted business fields, not the raw item, so volatile payload
+        # fields do not flag unchanged offers as changed on every run.
+        content_hash = hashlib.sha256(
+            "\n".join([title, company, location, remote, seniority, contract_type, description]).encode("utf-8")
+        ).hexdigest()
         return Offer(
             source=self.name,
             source_id=source_id,
@@ -193,8 +199,8 @@ class FranceTravailConnector:
             title=title,
             company=company,
             location=location,
-            remote=_remote_text(item),
-            seniority=str(item.get("experienceLibelle") or ""),
+            remote=remote,
+            seniority=seniority,
             contract_type=contract_type,
             description=description,
             content_hash=content_hash,

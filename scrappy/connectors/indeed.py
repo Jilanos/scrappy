@@ -3,7 +3,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Iterable
 from urllib.error import HTTPError, URLError
 from urllib.parse import quote, urlencode
@@ -21,9 +21,9 @@ DEFAULT_APIFY_ACTOR_ID = "misceres~indeed-scraper"
 @dataclass(frozen=True)
 class IndeedApiConnector:
     endpoint: str = ""
-    api_key: str = ""
+    api_key: str = field(default="", repr=False)
     provider: str = "generic"
-    apify_token: str = ""
+    apify_token: str = field(default="", repr=False)
     apify_actor_id: str = DEFAULT_APIFY_ACTOR_ID
     country: str = DEFAULT_INDEED_COUNTRY
     location: str = DEFAULT_INDEED_LOCATION
@@ -127,7 +127,12 @@ class IndeedApiConnector:
         source_id = _pick(item, "id", "jobId", "job_id", "key", "jobkey", "jobKey", "indeedApplyJobId")
         if not source_id:
             source_id = hashlib.sha256((url or json.dumps(item, sort_keys=True)).encode("utf-8")).hexdigest()[:20]
-        content_hash = hashlib.sha256(json.dumps(item, sort_keys=True, ensure_ascii=False).encode("utf-8")).hexdigest()
+        seniority = _pick(item, "seniority", "experienceLevel")
+        # Hash the extracted business fields, not the raw item, so volatile payload
+        # fields do not flag unchanged offers as changed on every run.
+        content_hash = hashlib.sha256(
+            "\n".join([title, company, location, remote, seniority, contract_type, description]).encode("utf-8")
+        ).hexdigest()
         return Offer(
             source=self.name,
             source_id=source_id,
@@ -136,7 +141,7 @@ class IndeedApiConnector:
             company=company,
             location=location,
             remote=remote,
-            seniority=_pick(item, "seniority", "experienceLevel"),
+            seniority=seniority,
             contract_type=contract_type,
             description=description,
             content_hash=content_hash,
@@ -192,11 +197,18 @@ class IndeedApiConnector:
     def _search_apify(self, query: str, max_items: int) -> SearchPage:
         payload = self._apify_input(query=query, max_items=max_items)
         actor_id = quote(self.apify_actor_id, safe="~")
-        params = urlencode({"token": self.apify_token, "format": "json", "clean": "true", "timeout": self.timeout_seconds})
+        params = urlencode({"format": "json", "clean": "true", "timeout": self.timeout_seconds})
         request = Request(
             f"https://api.apify.com/v2/acts/{actor_id}/run-sync-get-dataset-items?{params}",
             data=json.dumps(payload).encode("utf-8"),
-            headers={"Content-Type": "application/json", "Accept": "application/json", "User-Agent": self.user_agent},
+            headers={
+                "Content-Type": "application/json",
+                "Accept": "application/json",
+                "User-Agent": self.user_agent,
+                # Bearer header instead of ?token=... so the secret never lands in
+                # intermediary access logs.
+                "Authorization": f"Bearer {self.apify_token}",
+            },
             method="POST",
         )
         try:

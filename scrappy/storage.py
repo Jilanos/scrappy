@@ -151,7 +151,7 @@ def upsert_offer(conn: sqlite3.Connection, run_id: int, offer: Offer) -> tuple[i
     dedupe_key = offer_dedupe_key(offer)
     existing = conn.execute(
         """
-        SELECT id, content_hash FROM offers
+        SELECT id, source, source_id, content_hash FROM offers
         WHERE (source = ? AND source_id = ?)
            OR canonical_url = ?
            OR (dedupe_key != '' AND dedupe_key = ?)
@@ -163,30 +163,46 @@ def upsert_offer(conn: sqlite3.Connection, run_id: int, offer: Offer) -> tuple[i
     changed = True
     if existing:
         offer_id = int(existing["id"])
-        changed = existing["content_hash"] != content_hash
-        if changed:
-            conn.execute(
-                """
-                UPDATE offers
-                SET title = ?, company = ?, location = ?, remote = ?, seniority = ?,
-                    contract_type = ?, description = ?, content_hash = ?, dedupe_key = ?, last_seen_at = ?
-                WHERE id = ?
-                """,
-                (
-                    offer.title,
-                    offer.company,
-                    offer.location,
-                    offer.remote,
-                    offer.seniority,
-                    offer.contract_type,
-                    offer.description,
-                    content_hash,
-                    dedupe_key,
-                    now,
-                    offer_id,
-                ),
-            )
+        same_source = existing["source"] == offer.source and existing["source_id"] == offer.source_id
+        if same_source:
+            changed = existing["content_hash"] != content_hash
+            if changed:
+                conn.execute(
+                    """
+                    UPDATE offers
+                    SET title = ?, company = ?, location = ?, remote = ?, seniority = ?,
+                        contract_type = ?, description = ?, content_hash = ?, dedupe_key = ?, last_seen_at = ?
+                    WHERE id = ?
+                    """,
+                    (
+                        offer.title,
+                        offer.company,
+                        offer.location,
+                        offer.remote,
+                        offer.seniority,
+                        offer.contract_type,
+                        offer.description,
+                        content_hash,
+                        dedupe_key,
+                        now,
+                        offer_id,
+                    ),
+                )
+            else:
+                conn.execute("UPDATE offers SET last_seen_at = ? WHERE id = ?", (now, offer_id))
         else:
+            # Cross-source duplicate: keep the canonical row's content and compare the
+            # observation against this source's own history, otherwise the two sources
+            # overwrite each other and every run re-flags the offer as changed.
+            last_observation = conn.execute(
+                """
+                SELECT content_hash FROM source_observations
+                WHERE offer_id = ? AND source = ?
+                ORDER BY id DESC LIMIT 1
+                """,
+                (offer_id, offer.source),
+            ).fetchone()
+            changed = last_observation is None or last_observation["content_hash"] != content_hash
             conn.execute("UPDATE offers SET last_seen_at = ? WHERE id = ?", (now, offer_id))
     else:
         cur = conn.execute(
@@ -360,9 +376,10 @@ def iter_offers(conn: sqlite3.Connection) -> Iterable[tuple[int, Offer]]:
 
 
 def hash_offer(offer: Offer) -> str:
+    # The URL is deliberately excluded: cross-source duplicates of the same job carry
+    # different URLs, and including them would make identical content hash differently.
     payload = "\n".join(
         [
-            offer.url,
             offer.title,
             offer.company,
             offer.location,

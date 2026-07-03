@@ -39,6 +39,15 @@ def test_maps_france_travail_offer_to_offer_model() -> None:
     assert offer.remote == "teletravail"
 
 
+def test_repr_does_not_leak_credentials() -> None:
+    connector = FranceTravailConnector(client_id="public-id", client_secret="secret-value")
+
+    text = repr(connector)
+
+    assert "secret-value" not in text
+    assert "public-id" not in text
+
+
 def test_discovers_france_travail_offers_with_pagination_stats() -> None:
     class FixtureConnector(FranceTravailConnector):
         def access_token(self) -> str:

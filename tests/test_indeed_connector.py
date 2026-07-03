@@ -90,6 +90,15 @@ def test_maps_apify_actor_payload_to_offer() -> None:
     assert result.offers[0].contract_type == "Fulltime"
 
 
+def test_repr_does_not_leak_secrets() -> None:
+    connector = IndeedApiConnector(api_key="secret-key", apify_token="secret-token")
+
+    text = repr(connector)
+
+    assert "secret-key" not in text
+    assert "secret-token" not in text
+
+
 def test_builds_borderline_apify_input_shape() -> None:
     connector = IndeedApiConnector(
         provider="apify",

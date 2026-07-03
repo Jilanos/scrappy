@@ -158,8 +158,11 @@ class WttjPublicConnector:
             if part
         )
         source_id = str(hit.get("objectID") or hit.get("reference") or f"{org_slug}:{job_slug}")
+        # Hash the extracted business fields, not the raw hit: Algolia hits carry
+        # query-dependent fields (_highlightResult, _rankingInfo) that would flag the
+        # same offer as changed on every run reached through a different query.
         content_hash = hashlib.sha256(
-            json.dumps(hit, sort_keys=True, ensure_ascii=False).encode("utf-8")
+            "\n".join([title, company, location, remote, seniority, contract_type, description]).encode("utf-8")
         ).hexdigest()
         return Offer(
             source=self.name,

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import functools
 import re
+import unicodedata
 from collections.abc import Iterable
 
 from scrappy.models import Offer, ScoreResult
@@ -15,7 +16,7 @@ def score_offer(offer: Offer, profile: dict) -> ScoreResult:
     text = _offer_text(offer)
     location_status, location_ok = _location_status(offer)
     contract_status, contract_ok = _contract_status(text)
-    exclusion = _hard_exclusion(text)
+    exclusion = _hard_exclusion(text, profile)
     if exclusion:
         return ScoreResult(
             score=0,
@@ -102,22 +103,35 @@ def score_offer(offer: Offer, profile: dict) -> ScoreResult:
 
 
 def _offer_text(offer: Offer) -> str:
-    return " ".join(
-        [
-            offer.title,
-            offer.company,
-            offer.location,
-            offer.remote,
-            offer.seniority,
-            offer.contract_type,
-            offer.description,
-        ]
-    ).lower()
+    return _fold(
+        " ".join(
+            [
+                offer.title,
+                offer.company,
+                offer.location,
+                offer.remote,
+                offer.seniority,
+                offer.contract_type,
+                offer.description,
+            ]
+        )
+    )
+
+
+def _fold(value: str) -> str:
+    """Lowercase and strip diacritics so accented French text matches the unaccented terms.
+
+    Without this, gate terms such as ``teletravail`` or ``confirme`` never match real
+    French offers written « télétravail », « confirmé », « expérience ».
+    """
+
+    decomposed = unicodedata.normalize("NFKD", value)
+    return "".join(char for char in decomposed if not unicodedata.combining(char)).lower()
 
 
 def _location_status(offer: Offer) -> tuple[str, bool]:
-    location_text = " ".join([offer.location, offer.remote]).lower()
-    remote_text = " ".join([offer.remote, offer.description]).lower()
+    location_text = _fold(" ".join([offer.location, offer.remote]))
+    remote_text = _fold(" ".join([offer.remote, offer.description]))
     if _contains_any(remote_text, ["full remote", "fully remote", "remote first", "remote-first", "100% remote"]):
         return "full remote", True
     if re.search(r"\bparis\b", location_text):
@@ -165,7 +179,7 @@ def _contract_status(text: str) -> tuple[str, bool]:
 
 def _seniority_score(offer: Offer) -> tuple[str, int, bool]:
     text = _offer_text(offer)
-    title_text = offer.title.lower()
+    title_text = _fold(offer.title)
     if _contains_any(text, ["internship", "intern ", "stage", "apprenticeship", "alternance", "work-study"]):
         return "internship/apprenticeship", 0, False
     if _contains_any(text, ["junior", "entry level", "entry-level", "graduate"]):
@@ -184,8 +198,8 @@ def _seniority_score(offer: Offer) -> tuple[str, int, bool]:
 def _max_required_years(text: str) -> int:
     years = []
     patterns = [
-        r"(\d{1,2})\s*\+?\s*(?:years?|ans)\s+(?:of\s+)?experience",
-        r"(?:experience|exp[. ]*)\s*(?:of\s*)?(\d{1,2})\s*\+?\s*(?:years?|ans)",
+        r"(\d{1,2})\s*\+?\s*(?:years?|ans)\s+(?:of\s+|d\W{0,2}\s*)?experience",
+        r"(?:experience|exp[. ]*)\s*(?:of\s*|de\s*)?(\d{1,2})\s*\+?\s*(?:years?|ans)",
         r"(?:minimum|min\.?|at least|au moins)\s*(\d{1,2})\s*\+?\s*(?:years?|ans)",
     ]
     for pattern in patterns:
@@ -193,12 +207,20 @@ def _max_required_years(text: str) -> int:
     return max(years, default=0)
 
 
-def _hard_exclusion(text: str) -> str | None:
-    if _contains_any(text, ["internship", "apprenticeship", "alternance", "work-study"]):
+DEFAULT_HARD_EXCLUSION_TERMS = ["internship", "apprenticeship", "alternance", "work-study"]
+DEFAULT_MILITARY_TERMS = ["military", "defense", "defence", "army", "navy", "air force", "armement", "militaire"]
+DEFAULT_ALLOWED_ADJACENT_TERMS = ["detection", "sensing", "imaging", "safety", "security"]
+
+
+def _hard_exclusion(text: str, profile: dict) -> str | None:
+    hard_terms = profile_terms(profile, "exclusions", "hard_terms") or DEFAULT_HARD_EXCLUSION_TERMS
+    military_terms = profile_terms(profile, "exclusions", "military_terms") or DEFAULT_MILITARY_TERMS
+    adjacent_terms = (
+        profile_terms(profile, "exclusions", "allowed_adjacent_terms") or DEFAULT_ALLOWED_ADJACENT_TERMS
+    )
+    if _contains_any(text, hard_terms):
         return "excluded internship/apprenticeship"
-    military = _contains_any(text, ["military", "defense", "defence", "army", "navy", "air force", "armement", "militaire"])
-    adjacent = _contains_any(text, ["detection", "sensing", "imaging", "safety", "security"])
-    if military and not adjacent:
+    if _contains_any(text, military_terms) and not _contains_any(text, adjacent_terms):
         return "excluded direct military role"
     return None
 
@@ -227,7 +249,7 @@ def _downrank_signals(text: str) -> list[str]:
 def _matched_terms(text: str, terms: Iterable[str]) -> list[str]:
     hits = []
     for term in terms:
-        normalized = str(term).strip().lower()
+        normalized = _fold(str(term).strip())
         if normalized and _term_regex(normalized).search(text):
             hits.append(str(term))
     return hits
@@ -255,4 +277,4 @@ def _domain_primary_hits(primary_hits: Iterable[str]) -> list[str]:
 
 
 def _contains_any(text: str, terms: Iterable[str]) -> bool:
-    return any(str(term).lower() in text for term in terms)
+    return any(_fold(str(term)) in text for term in terms)
