@@ -1,7 +1,7 @@
-version: initial-cv-2026-06-23
+version: example-profile
 candidate:
   summary:
-    - Engineer-PhD in imaging and medical physics
+    - Example candidate: R&D engineer with a physics PhD
     - Signal processing, electronics and instrumentation background
     - Hands-on system integration and hardware debugging
 skills:
