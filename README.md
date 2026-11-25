@@ -1,8 +1,39 @@
 # Scrappy
 
-Local-first job-offer review assistant.
+Local-first CLI that collects job offers, scores them against your profile and tells you which skills to learn next.
 
-The MVP goal is to collect configured job offers, store every encountered offer in a local SQLite database, avoid reprocessing unchanged offers, score new offers against a local user profile, and produce an explainable shortlist.
+## Problem and audience
+
+Searching for a job means reading hundreds of offers on several sites. Scrappy is for a job seeker who wants a short, explainable shortlist and who keeps the data on their own machine. It collects offers from configured sources, stores every offer in a local SQLite database, skips offers that did not change, scores new ones against a YAML profile, and writes a shortlist as console output and an XLSX workbook. Each score lists its reasons, so you can calibrate the rules.
+
+## Quick start
+
+Requires Python 3.11 or later. There is no runtime dependency.
+
+```bash
+git clone https://github.com/Jilanos/scrappy.git
+cd scrappy
+python3 -m scrappy init-db --db data/scrappy.sqlite
+python3 -m scrappy run --db data/scrappy.sqlite --profile examples/profile.yaml \
+  --provider wttj-public --target-offers 100 --max-pages 5 --xlsx reports/top_offers.xlsx
+```
+
+`examples/profile.yaml` is the profile of the author. Copy it and edit it to match your own search. The `wttj-public` provider needs no account. Other providers need credentials, see "Provider status".
+
+Run the tests:
+
+```bash
+python3 -m venv .venv && .venv/bin/pip install pytest
+.venv/bin/python -m pytest -q
+```
+
+## Tech stack
+
+Python 3.11+ standard library only (argparse, sqlite3, a hand-written XLSX writer and reader). pytest for tests. Hatchling for packaging.
+
+## Status
+
+Version 0.1.0, an MVP in active use by its author. The WTTJ connector relies on a public search endpoint that can change without notice. Indeed has no free public API, so its connector needs a third-party provider.
 
 ## Current implementation
 
